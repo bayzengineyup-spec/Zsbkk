@@ -1,20 +1,49 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Krallıklar Çağı
 
-# Run and deploy your AI Studio app
+Mobil öncelikli, izometrik, canlı bir dünyada geçen strateji + medeniyet oyunu.
+WorldBox'ın canlılığı + Civilization'ın derinliği + Rise of Kingdoms'ın erişilebilirliği.
 
-This contains everything you need to run your app locally.
+> Bu depo, `prototype/kralliklar-cagi-v0.5.html` (tek dosyalık zengin prototip)
+> temel alınarak **modüler, test edilebilir, çok oyunculuya hazır** bir projeye
+> dönüştürülmektedir.
 
-View your app in AI Studio: https://ai.studio/apps/a4e1c941-9459-4074-96f4-fc207d809fce
+---
 
-## Run Locally
+## 📚 Plan / Tasarım Dokümanları
 
-**Prerequisites:**  Node.js
+Büyük plan çok parçalıdır. Sırayla:
 
+| # | Doküman | İçerik |
+|---|---------|--------|
+| 00 | [Genel Bakış](docs/00-GENEL-BAKIS.md) | Vizyon, sütunlar, oyun hissi, tasarım ilkeleri |
+| 01 | [Mimari](docs/01-MIMARI.md) | Teknoloji yığını, determinizm, klasör yapısı, göç planı |
+| 02 | [Grafik & Sanat](docs/02-GRAFIK-SANAT.md) | Gerçek dokular, boyut/oran, animasyon, "çizgi film" düzeltmesi |
+| 03 | [Ekonomi & İnşa](docs/03-EKONOMI-INSA.md) | İnşa süreleri, üretim zincirleri, depo, bina kataloğu |
+| 04 | [Nüfus & Toplum](docs/04-NUFUS-TOPLUM.md) | Köylü yaşamı, ihtiyaçlar, meslek, mutluluk |
+| 05 | [Savaş](docs/05-SAVAS.md) | Birim kontrolü, saldırı, kuşatma, komutanlar, savunma |
+| 06 | [Diplomasi & Krallıklar](docs/06-DIPLOMASI.md) | Yapay zeka beyni, antlaşmalar, casusluk, koalisyon |
+| 07 | [İlerleme & Çağlar](docs/07-ILERLEME.md) | Çağlar, teknoloji ağacı, harikalar, zafer koşulları |
+| 08 | [Dünya & Olaylar](docs/08-DUNYA-OLAYLAR.md) | Harita üretimi, hava, mevsim, felaketler, yaban hayat |
+| 09 | [Arayüz & UX](docs/09-UI-UX.md) | Mobil kontroller, HUD, paneller, öğretici, yerelleştirme |
+| 10 | [Kayıt & Devamlılık](docs/10-KAYIT.md) | Kaldığın yerden devam, otomatik kayıt, çevrimdışı ilerleme |
+| 11 | [Yol Haritası](docs/11-YOL-HARITASI.md) | Fazlar, kilometre taşları, teslimatlar, bağımlılıklar |
+| 12 | [Backlog](docs/12-BACKLOG.md) | Tüm özellik/bina/birim/sistem havuzu |
+| — | [DURUM (nerede kaldık)](docs/DURUM.md) | **Canlı ilerleme takibi** — her oturumda güncellenir |
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+---
+
+## 🎯 Şu anki durum
+
+Proje **Faz 0 — Temel** öncesinde, planlama aşamasında.
+Güncel ilerleme her zaman [docs/DURUM.md](docs/DURUM.md) dosyasındadır.
+
+## 🚀 Geliştirme (Faz 0 sonrası kurulacak)
+
+```bash
+npm install
+npm run dev      # yerel geliştirme sunucusu
+npm run build    # üretim derlemesi
+```
+
+Prototipi hemen denemek için `prototype/kralliklar-cagi-v0.5.html` dosyasını
+bir tarayıcıda açın (yatay ekran / mobil önerilir).
