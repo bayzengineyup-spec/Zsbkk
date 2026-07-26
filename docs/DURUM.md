@@ -4,6 +4,16 @@
 > her oturum sonunda güncellenir. "Neredeydik, ne yaptık, sırada ne var?"
 
 ## 📍 Şu an
+- **🧭 YENİ ANA PLAN: `docs/13-BUYUK-PLAN-2.md` (Aşama 3→15).**
+  Kullanıcı oyunu test etti, **2/10** verdi ve 12 maddelik geri bildirim
+  bıraktı (arayüz karışık, sesler -100/10, nedensiz mesaj yağmuru,
+  sonsuz dünya istiyor, AI 20x, grafik hâlâ çocuksu, tutorial atlanabilir,
+  inşa süreleri uzasın, başlangıç sissiz, sistemler 5x, animasyon, yeni
+  içerik). Tümü plana madde madde işlendi + 15 maddelik kendi analizim.
+  **SIRADAKİ İŞ: AŞAMA 3 — Büyük Temizlik** (arayüz sadeleştirme,
+  nedene bağlı olay sistemi + olay günlüğü, sissiz geniş başlangıç,
+  atlanabilir tutorial, inşa süreleri +%50-75, zorluk seçimi).
+  Oynanabilir sürüm: https://claude.ai/code/artifact/cc19062c-708e-4c4c-9e9d-b25ce38dc3fd
 - **Aşama:** **FAZ 2 · M2 TAMAMLANDI** — görsel yenileme tüm dünya
   nesnelerine yayıldı: hayvanlar/askerler/kervanlar/AI başkentleri v2 +
   canlı ayrıntılar (baca dumanı, dönen değirmen kanadı, dalgalanan
