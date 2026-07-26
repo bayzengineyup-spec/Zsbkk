@@ -34,15 +34,18 @@ Büyük plan çok parçalıdır. Sırayla:
 
 ## 🎯 Şu anki durum
 
-Proje **Faz 0 — Temel** öncesinde, planlama aşamasında.
+**Faz 0 · M1 tamamlandı** — modüler motor çalışıyor: deterministik dünya
+üretimi (testli), izometrik render, dokunmatik kamera, minimap.
 Güncel ilerleme her zaman [docs/DURUM.md](docs/DURUM.md) dosyasındadır.
 
-## 🚀 Geliştirme (Faz 0 sonrası kurulacak)
+## 🚀 Geliştirme
 
 ```bash
 npm install
-npm run dev      # yerel geliştirme sunucusu
-npm run build    # üretim derlemesi
+npm run dev      # yerel geliştirme sunucusu (Vite)
+npm run build    # üretim derlemesi → dist/
+npm run test     # Vitest — determinizm + dünya üretimi testleri
+npm run lint     # tsc --noEmit tip denetimi
 ```
 
 Prototipi hemen denemek için `prototype/kralliklar-cagi-v0.5.html` dosyasını

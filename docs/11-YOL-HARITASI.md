@@ -10,14 +10,14 @@ ama sanat (Faz 2) ve derinlik fazları iç içe ilerleyebilir.
 
 ## FAZ 0 — Temel (altyapı) `[sürüm 0.6]`
 Amaç: prototipi modüler, test edilebilir projeye taşımak.
-- [ ] Vite + TS + Vitest + ESLint kurulumu; eski React iskeletini kaldır.
-- [ ] Klasör yapısı (core/render/ui/data/save) — bkz. 01-MIMARI.
-- [ ] RNG + Noise + World üretimini core'a taşı (deterministik testli).
-- [ ] Render çekirdeği (atlas, doku, kamera, izometrik) porta.
-- [ ] Dokunmatik input porta.
-- [ ] Ekonomi + köylü + olay + diplomasi + savaş çekirdeğini modüllere böl.
-- [ ] Veri dosyaları: buildings/units/techs/biomes/events JSON'a çıkar.
-- [ ] Bilinen bug'lar: tekrarlı `#rail` butonları vb. temizlik.
+- [x] Vite + TS (strict) + Vitest kurulumu; eski React iskeletini kaldır. *(lint kapısı: `tsc --noEmit`)*
+- [x] Klasör yapısı (core/render/ui/data/test) — bkz. 01-MIMARI.
+- [x] RNG + Noise + World üretimini core'a taşı (deterministik testli, 18 test).
+- [x] Render çekirdeği: kamera + izometrik çizim + minimap. *(M1: Canvas2D sprite; WebGL atlas sprite sayısı artınca)*
+- [x] Dokunmatik input porta (atalet, pinch, çift dokunuş, uzun basma).
+- [ ] Ekonomi + köylü + olay + diplomasi + savaş çekirdeğini modüllere böl. **← M2, buradayız**
+- [ ] Veri dosyaları: buildings/units/techs/events ayrı veri modüllerine. *(biomes taşındı)*
+- [x] Bilinen bug'lar: tekrarlı `#rail` butonları — yeni arayüzde yok.
 - **Bitti kriteri:** prototiple aynı oyun, artık modüler + testli çalışıyor.
 
 ## FAZ 1 — İnşa süreleri & ekonomi derinliği `[0.7]`
