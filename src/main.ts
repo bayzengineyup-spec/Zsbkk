@@ -4,7 +4,7 @@
    UI komut üretir → sim uygular (docs/01-MIMARI).
    ============================================================ */
 import { World } from './core/world';
-import { Sim } from './core/sim';
+import { Sim, type Difficulty } from './core/sim';
 import { BIOMES } from './data/biomes';
 import { BUILDINGS, costStr, upgradeCost, upgradeTime, type BuildingType } from './data/buildings';
 import { Camera, type Viewport } from './render/camera';
@@ -96,6 +96,72 @@ let replayKc: number | null = null; // tekrar meta: rakip sayısı (yalnız yeni
 const stats: RenderStats = { tiles: 0, sprites: 0 };
 
 initToasts(el('toasts'));
+
+// ---------- olay günlüğü (Aşama 3 / G12): tek bildirim kanalı yerine
+// kalıcı günlük; toast yalnız ACİL olaylara ----------
+const URGENT = new RegExp(
+  'SALDIRI|saldırı ordusu|üzerine yürüyor|savaşa tutuştu|savaş başladı|BARBAR|AKIN'
+  + '|açlıktan|öldü|can aldı|YANGIN|ateşe verildi|kül oldu|VEBA|DEPREM|KASIRGA|İSYAN'
+  + '|yenildi|bozguna|püskürttün|Baskın|ZAFER|zafer|esir|Meydan ağır|Sen yokken'
+  + '|ihanet|karşı savaş|kaybettin|çekildi',
+);
+interface JEntry { t: string; msg: string; kind: string; }
+const journal: JEntry[] = [];
+let jUnread = 0;
+let journalOpen = false;
+
+function jTimeLabel(): string {
+  if (!sim) return '';
+  const s = sim.currentSeason();
+  return `${sim.time.year}.yıl ${s.icon}`;
+}
+
+function refreshJBadge(): void {
+  const b = el<HTMLElement>('jbadge');
+  if (jUnread > 0) { b.textContent = jUnread > 99 ? '99+' : String(jUnread); b.classList.add('show'); }
+  else b.classList.remove('show');
+}
+
+function renderJournal(): void {
+  const list = el<HTMLElement>('jlist');
+  if (!journal.length) {
+    list.innerHTML = '<div class="jempty">Henüz kayda değer bir olay yok — krallığın hikâyesi burada birikecek.</div>';
+    return;
+  }
+  list.innerHTML = journal
+    .map(e => `<div class="jrow ${e.kind}"><span class="jt">${e.t}</span><span class="jm">${e.msg}</span></div>`)
+    .join('');
+}
+
+function addJournal(msg: string, kind: string): void {
+  journal.unshift({ t: jTimeLabel(), msg, kind });
+  if (journal.length > 120) journal.pop();
+  if (!journalOpen) { jUnread++; refreshJBadge(); }
+  else renderJournal();
+}
+
+function toggleJournal(force?: boolean): void {
+  journalOpen = force ?? !journalOpen;
+  el('journalpanel').classList.toggle('show', journalOpen);
+  el('btn-journal').classList.toggle('on', journalOpen);
+  if (journalOpen) { jUnread = 0; refreshJBadge(); renderJournal(); }
+}
+el('btn-journal').onclick = () => toggleJournal();
+
+// mini harita aç/kapa (varsayılan kapalı — harita görünsün)
+el('btn-map').onclick = () => {
+  const on = !mm.classList.contains('show');
+  mm.classList.toggle('show', on);
+  el('btn-map').classList.toggle('on', on);
+};
+
+// üst şerit: ikincil kaynaklar aç/kapa
+el('top-toggle').onclick = () => {
+  const more = el<HTMLElement>('topmore');
+  const on = !more.classList.contains('show');
+  more.classList.toggle('show', on);
+  el('top-toggle').textContent = on ? '▴' : '▾';
+};
 
 // ---------- ipucu ----------
 const hintEl = el<HTMLElement>('hint');
@@ -584,7 +650,7 @@ function closeTech(): void {
   bTech.classList.remove('on');
 }
 
-el('b-explore').onclick = () => { cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); closeArmyPanel(); };
+el('b-explore').onclick = () => { cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); closeArmyPanel(); toggleJournal(false); };
 bBuild.onclick = () => {
   if (buildpanel.classList.contains('show')) closeBuildPanel();
   else { cancelPlace(); closeDiplo(); closeTech(); openBuildPanel(); }
@@ -627,7 +693,7 @@ function refreshMenu(): void {
 bMenu.onclick = () => {
   if (menupanel.classList.contains('show')) closeMenu();
   else {
-    cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); closeArmyPanel();
+    cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); closeArmyPanel(); toggleJournal(false);
     refreshMenu();
     menupanel.classList.add('show');
     bMenu.classList.add('on');
@@ -665,6 +731,7 @@ el('m-replay').onclick = () => {
     kingdoms: replayKc,
     ticks: sim.tickCount,
     entries: sim.cmdLog,
+    difficulty: sim.difficulty,
   };
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -696,7 +763,7 @@ el('m-new').onclick = () => {
   el('boot').style.display = 'flex';
   renderSlots();
   world = null; sim = null; minimap = null;
-  cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); closeArmyPanel(); hideInfo();
+  cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); closeArmyPanel(); toggleJournal(false); hideInfo();
 };
 
 // diplomasi paneli bağlantısı
@@ -762,7 +829,7 @@ el<HTMLButtonElement>('end-again').onclick = () => {
   el('endscreen').classList.remove('show');
   endShown = false;
   world = null; sim = null; minimap = null;
-  cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); closeArmyPanel(); hideInfo();
+  cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); closeArmyPanel(); toggleJournal(false); hideInfo();
   el('boot').style.display = 'flex';
   renderSlots();
 };
@@ -790,11 +857,13 @@ function startGame(size: number): void {
     const seed = (Math.random() * 1e9) | 0; // yalnız tohum üretimi — sim dışı
     // rakip krallık sayısı (boyuta göre); kuruluş sırası tekrarla BİREBİR aynı
     const kc = size <= 192 ? (size <= 128 ? 6 : 6) : size <= 256 ? 9 : 13;
-    const r = setupGame(seed, size, size, kc);
+    const diff = (el<HTMLSelectElement>('opt-diff').value as Difficulty) || 'normal';
+    const r = setupGame(seed, size, size, kc, diff);
     world = r.world;
     sim = r.sim;
     sim.cmdLog = []; // komut kaydı: bu oturumda tekrar dışa aktarılabilir
     replayKc = kc;
+    journal.length = 0; jUnread = 0; refreshJBadge(); // taze günlük
     const spot = r.spot;
     resetTutorial();
     finishSetup(spot.x, spot.y);
@@ -821,6 +890,7 @@ function continueGame(): void {
     world = r.world;
     sim = r.sim;
     replayKc = null; // kayıttan devam: tekrar kaydı bu oturumda tutulamaz
+    journal.length = 0; jUnread = 0; refreshJBadge();
     resetTutorial(r.ui.tut);
     // çevrimdışı ilerleme: sen yokken köy kaba üretim yaptı
     const rep = applyOfflineProgress(sim, r.elapsedSec);
@@ -942,9 +1012,10 @@ function loop(t: number): void {
     if (guard >= 5) simAcc = 0;
     alpha = Math.max(0, Math.min(1, simAcc / SIM_STEP));
 
-    // sim olaylarını bildirim + sese çevir
+    // sim olayları: HEPSİ günlüğe; yalnız ACİL olanlar bildirim (Aşama 3)
     for (const ev of sim.drainEvents()) {
-      toast(ev.msg, ev.kind);
+      addJournal(ev.msg, ev.kind);
+      if (URGENT.test(ev.msg)) toast(ev.msg, ev.kind);
       sfxForToast(ev.msg, ev.kind);
     }
     updateMusic(sim);

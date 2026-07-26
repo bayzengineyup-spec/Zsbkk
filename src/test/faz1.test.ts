@@ -24,8 +24,8 @@ describe('Faz 1 — İnşa süreleri', () => {
     const b = s.buildingAt(p.x + 1, p.y)!;
     expect(b.buildLeft).toBeGreaterThan(0);
     expect(s.player.popCap).toBe(popCapBefore); // henüz katkı yok
-    // ev 10 sn; 5 boşta işçi → 3 şantiyede → hız 2.5x → ~4 sn
-    for (let i = 0; i < 60; i++) s.tick(0.1);
+    // ev 16 sn (Aşama 3: süreler ×1.6); 3 şantiye işçisi → 2.5x → ~6.4 sn
+    for (let i = 0; i < 90; i++) s.tick(0.1);
     expect(b.buildLeft).toBeUndefined();
     expect(s.player.popCap).toBe(popCapBefore + 6); // şimdi katkı var
   });
@@ -52,8 +52,8 @@ describe('Faz 1 — İnşa süreleri', () => {
       return ticks;
     })();
     expect(t2).toBeLessThan(t1); // işçili köy belirgin hızlı
-    expect(t1).toBeLessThanOrEqual(101); // temel hız 1x → ~10 sn
-    expect(t2).toBeLessThanOrEqual(45);  // 2.5x → ~4 sn
+    expect(t1).toBeLessThanOrEqual(165); // temel hız 1x → ~16 sn (Aşama 3 süreleri)
+    expect(t2).toBeLessThanOrEqual(70);  // 2.5x → ~6.4 sn (Aşama 3 süreleri)
   });
 
   it('inşaat kuyruğu sınırı: merkez sv1 → 2 eşzamanlı inşaat', () => {

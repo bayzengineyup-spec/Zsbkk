@@ -23,6 +23,8 @@
 | G10 | Arayüz **çok karışık ve kaba** — harita görünmüyor, her yer kaplı | Aşama 3 (arayüz büyük sadeleştirme — İLK İŞ) |
 | G11 | Sesler **berbat (-100/10)** — her eylem için AYRI, GERÇEKçi orta çağ sesi (çekiç, odun…) | Aşama 4 (ses devrimi — sentez terk ediliyor) |
 | G12 | Oyun başında **nedensiz mesaj yağmuru** — gerçek olay yokken mesaj gelmesin | Aşama 3 (olay sistemi nedene bağlanır + olay günlüğü) |
+| G13 | Bir sürü **yeni hayvan, biyom, bitki, yapı çeşitliliği** | Aşama 11 (Dünya Çeşitliliği) |
+| G14 | **Ülke seçimi** — ulusa özel asker/doku/mekanik; her canlıya özel animasyon/mekanik | Aşama 12 (ULUSLAR) + Aşama 11 (tür başına davranış) |
 
 **Kalıcı ilkeler (değişmez):**
 - Determinizm + komut deseni korunur (çok oyunculu hedefi canlı).
@@ -183,30 +185,63 @@ Amaç: "çocuksu" hissin kökü düz renk + ışıksızlık; burada kırılır.
 - **M10.5 Zafer 2.0 (A10):** gerçek refah/diplomasi/mucize zaferleri;
   puan dökümü ve oyun sonu haritası.
 
-### AŞAMA 11 — DÜNYA İÇERİĞİ (G4)
-- Harabeler/hazineler/kayıp teknolojiler (sonsuz dünyada keşif ödülü).
-- Nötr köyler: koru/haraç al/fethet seçimleri.
-- NEDENLİ olay zincirleri: "kuraklık → kıtlık → göç dalgası" gibi çok
-  adımlı, oyuncu kararlı hikâyecikler (G12 ile uyumlu: hepsi simüle).
-- Patron barbar kampları: haritada görünür, temizlenmezse büyür.
+### AŞAMA 11 — DÜNYA ÇEŞİTLİLİĞİ (G4 + G13)
+Amaç: her keşif "yeni bir şey" göstersin.
+- **M11.1 Biyom çeşitliliği:** mevcut 16'ya ek — kayın/huş ormanı, sazlık
+  delta, çiçekli çayır, lavanta kırı, üzüm bağı yamacı, zeytinlik, mantar
+  koyağı, buzul kıyısı, mercan sığlığı, obsidyen tarlası… (sonsuz dünyada
+  bölgesel "iklim kuşakları" hâlinde dağılır).
+- **M11.2 Bitki çeşitliliği:** biyom başına 3-5 ağaç türü + çalılar,
+  sazlar, çiçek öbekleri, mantarlar, kaya oluşumları; toplanabilir
+  bitkiler (şifalı ot → sağlık mekaniği).
+- **M11.3 Hayvan çeşitliliği + TÜR BAŞINA MEKANİK (G14):** tilki (tavşan
+  avlar), ayı (nehirde balık tutar), kurt sürüsü (geyiği çevirir), yaban
+  atı (yakala→evcilleştir→ucuz süvari), kartal (gökte süzülür), yaban
+  keçisi (kayalıkta), balık sürüleri (görünür, balıkçı teknesi Aşama 10),
+  domuz (tarlaya dadanır), her türe ÖZEL animasyon seti.
+- **M11.4 Yapı çeşitliliği:** görsel varyantlar (aynı bina 2-3 çeşit
+  görünüm) + bölgesel malzeme (taş bölgede taş ev, ormanda ahşap).
+- **M11.5 Keşif içeriği:** harabeler/hazineler, nötr köyler
+  (koru/haraç/fethet), büyüyen barbar kampları, NEDENLİ olay zincirleri
+  ("kuraklık → kıtlık → göç dalgası").
 
-### AŞAMA 12 — SAVAŞ 2.0
+### AŞAMA 12 — ULUSLAR (G14)
+Amaç: "ben kimim?" sorusunun cevabı oyuna girsin.
+- **M12.1 Ülke seçimi:** yeni oyunda 6 ulus — ör. Bozkır Hanlığı,
+  Kuzey Krallığı, Çöl Sultanlığı, Orman Prensliği, Ada Cumhuriyeti,
+  Vadi Beyliği. Her biri: bayrak/renk/sembol + açılış metni.
+- **M12.2 Ulusa özel MİMARİ dokular:** aynı bina her uluslarda farklı
+  görünür (kuzeyde dik çatı+kütük, çölde kubbe+kerpiç, bozkırda çadır
+  öğeleri…) — sprite hattı Aşama 9 atlasına dayanır.
+- **M12.3 Ulusa özel ASKERLER:** her ulusta 1 özgün birim (atlı okçu /
+  baltalı akıncı / deve süvarisi / uzun yaycı / denizci baskıncı…) —
+  özel doku + özel animasyon + özel savaş mekaniği.
+- **M12.4 Ulusa özel MEKANİKLER:** pasif bonus + özel yetenek
+  (ör. bozkır: sürü hayvancılığı; kuzey: kışın üretim cezası yok;
+  çöl: kervan geliri x2; ada: balıkçılık+deniz ticareti…).
+- **M12.5 AI krallıklar da uluslardan gelir** — dokuları, birimleri,
+  davranış eğilimleri ulusa göre; dünyada kültür coğrafyası oluşur.
+- **M12.6 Ulusa özel müzik motifi + arayüz nişanı.**
+
+### AŞAMA 13 — SAVAŞ 2.0
 - Formasyonlar (hat/kama/çember), moral + bozgun kaçışı.
 - Kuşatma makineleri çeşitliliği (mancınık kule yıkar, kule ok üstünlüğü).
 - Kale savunma yerleşimi: sur hattı çizme, kapı, kule yerleşimi; savunma
   savaşını köyünde adım adım izleme.
+- Ulus birimleri (Aşama 12) savaş üçgenine dokunur — denge botu 3.0.
 
-### AŞAMA 13 — CİLA + PERFORMANS + ERİŞİLEBİLİRLİK
+### AŞAMA 14 — CİLA + PERFORMANS + ERİŞİLEBİLİRLİK
 - Cihaz matrisi (düşük RAM telefon dahil), pil dostu mod.
 - Erişilebilirlik (A12): renk körü paleti, yazı boyutu, titreşim ayarı.
 - Yerelleştirme altyapısı (TR ana; metinler tek dosyada).
 - Kayıt bulutu için hazırlık (dışa aktarım otomasyonu).
 
-### AŞAMA 14 — ÇOK OYUNCULU ALFA
+### AŞAMA 15 — ÇOK OYUNCULU ALFA
 - Replay altyapısı (hazır ✓) üstüne gerçek ağ: oda kur/katıl, lockstep
   senkron, kopukluk toparlama, gözlemci modu (= tekrar izleyici).
+- Uluslar çok oyunculuda asimetrik denge testi.
 
-### AŞAMA 15 — YAYIN
+### AŞAMA 16 — YAYIN
 - Mağaza paketleri (PWA + TWA/Android), telemetri (opsiyonel, anonim),
   canlı denge güncellemeleri, sürüm notları.
 

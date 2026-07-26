@@ -82,28 +82,35 @@ export function autoplay(s: Sim, minutes: number, seed: number): BalanceReport {
       if (burning) s.applyCommand({ kind: 'extinguish', x: burning.x, y: burning.y });
     }
 
-    // inşaat önceliği (tek şantiye sırayla — kuyruk sınırına takılmaz)
+    // inşaat önceliği: SIRALI istek listesi — koşulu tutan ilk BAŞARILI
+    // inşaatta durur; yer/kaynak bulunamazsa sıradakine geçer (kilitlenmez)
     if (sites() === 0) {
-      if (count('center') < 1) tryBuild('center'); // felaket sigortası
-      else if (count('farm') < 1) tryBuild('farm');
-      else if (count('woodcutter') < 1) tryBuild('woodcutter');
-      else if (count('farm') < 2) tryBuild('farm');
-      else if (count('woodcutter') < 2) tryBuild('woodcutter'); // odun ana darboğaz
-      else if (count('quarry') < 1) tryBuild('quarry');
-      else if (p.popCap - p.pop <= 1 && count('house') < 8 && p.res.wood > 60) tryBuild('house');
-      else if (count('woodcutter') < 3 && p.res.wood > 60) tryBuild('woodcutter');
-      else if (count('storehouse') < 1 && p.res.wood > 110) tryBuild('storehouse');
-      else if (count('farm') < 3 && p.res.food < p.pop * 14 && p.res.wood > 60) tryBuild('farm');
-      else if (count('barracks') < 1 && p.res.wood > 130 && p.res.stone > 60) tryBuild('barracks');
-      else if (count('lumbermill') < 1 && p.res.wood > 140) tryBuild('lumbermill');
-      else if (count('mill') < 1 && p.res.plank > 15) tryBuild('mill');
-      else if (count('bakery') < 1 && p.res.plank > 15) tryBuild('bakery');
-      else if (count('farm') < 4 && p.res.food < p.pop * 8 && p.res.wood > 80) tryBuild('farm');
-      else if (count('academy') < 1 && p.res.wood > 220 && p.res.stone > 130) tryBuild('academy');
-      else if (count('quarry') < 2 && p.res.wood > 220) tryBuild('quarry');
-      else if (count('mine') < 1 && p.res.wood > 280 && p.res.stone > 120) tryBuild('mine');
-      else if (count('wall') < 3 && p.res.stone > 300) tryBuild('wall');
-      else if (count('house') < 12 && p.popCap - p.pop <= 2 && p.res.wood > 120) tryBuild('house');
+      const wants: Array<[boolean, BuildingType]> = [
+        [count('center') < 1, 'center'], // felaket sigortası
+        [count('farm') < 1, 'farm'],
+        [count('woodcutter') < 1, 'woodcutter'],
+        [count('farm') < 2, 'farm'],
+        [count('hunter') < 1 && count('farm') < 1, 'hunter'], // tarlasız harita yedeği
+        [count('woodcutter') < 2, 'woodcutter'],
+        [count('quarry') < 1, 'quarry'],
+        [p.popCap - p.pop <= 1 && count('house') < 8 && p.res.wood > 60, 'house'],
+        [count('woodcutter') < 3 && p.res.wood > 60, 'woodcutter'],
+        [count('storehouse') < 1 && p.res.wood > 110, 'storehouse'],
+        [count('farm') < 3 && p.res.food < p.pop * 14 && p.res.wood > 60, 'farm'],
+        [count('barracks') < 1 && p.res.wood > 130 && p.res.stone > 60, 'barracks'],
+        [count('lumbermill') < 1 && p.res.wood > 140, 'lumbermill'],
+        [count('mill') < 1 && p.res.plank > 15, 'mill'],
+        [count('bakery') < 1 && p.res.plank > 15, 'bakery'],
+        [count('farm') < 4 && p.res.food < p.pop * 8 && p.res.wood > 80, 'farm'],
+        [count('academy') < 1 && p.res.wood > 220 && p.res.stone > 130, 'academy'],
+        [count('quarry') < 2 && p.res.wood > 220, 'quarry'],
+        [count('mine') < 1 && p.res.wood > 280 && p.res.stone > 120, 'mine'],
+        [count('wall') < 3 && p.res.stone > 300, 'wall'],
+        [count('house') < 12 && p.popCap - p.pop <= 2 && p.res.wood > 120, 'house'],
+      ];
+      for (const [cond, t] of wants) {
+        if (cond && tryBuild(t)) break;
+      }
     }
 
     // İŞÇİ YÖNETİMİ — gerçek oyuncu gibi:
@@ -114,20 +121,26 @@ export function autoplay(s: Sim, minutes: number, seed: number): BalanceReport {
         s.applyCommand({ kind: 'assign', x: b.x, y: b.y, delta: -1 });
       }
     }
-    // boştakileri üretime dağıt (2 kişi hep boşta: şantiye/söndürme adayı)
-    // ÖNCE tarlalar (yiyecek her şeyden önce), sonra kalanlar
-    if (p.idle > 2) {
+    // boştakileri üretime KATMANLI dağıt (küçük köyde 1, büyükte 2 yedek):
+    // 1) her oduncuya en az 1 işçi (odun geliri kesilmesin — kilit önleyici)
+    // 2) tarlalar dolsun (yiyecek)  3) kalan her şey
+    const hold = p.pop > 8 ? 2 : 1;
+    const assignTo = (b: { x: number; y: number }): boolean =>
+      s.applyCommand({ kind: 'assign', x: b.x, y: b.y, delta: 1 });
+    if (p.idle > hold) {
+      for (const b of p.buildings) {
+        if (p.idle <= hold) break;
+        if (b.type === 'woodcutter' && b.buildLeft === undefined && b.workers < 1) assignTo(b);
+      }
       const ordered = [...p.buildings].sort((a, b2) =>
         (a.type === 'farm' ? 0 : 1) - (b2.type === 'farm' ? 0 : 1));
       for (const b of ordered) {
-        if (p.idle <= 2) break;
+        if (p.idle <= hold) break;
         const def = BUILDINGS[b.type];
         if (def.maxWorkers <= 0 || b.buildLeft !== undefined) continue;
         // kereste bolsa bıçkıhaneye yeni işçi verme
         if (b.type === 'lumbermill' && p.res.plank > 60) continue;
-        if (b.workers < def.maxWorkers) {
-          s.applyCommand({ kind: 'assign', x: b.x, y: b.y, delta: 1 });
-        }
+        if (b.workers < def.maxWorkers) assignTo(b);
       }
     }
 

@@ -105,6 +105,8 @@ export interface MilitaryHost {
   toast(msg: string, kind?: '' | 'good' | 'bad'): void;
   /** baskın başarılı olursa köyde bir bina ateşe verilir (Faz 4 M3) */
   igniteRandomBuilding(): void;
+  /** zorluk: barbar akını boyut çarpanı (Aşama 3) */
+  barbarMult(): number;
 }
 
 export class MilitarySystem {
@@ -308,7 +310,9 @@ export class MilitarySystem {
     else if (edge === 2) { sx = (host.rng() * w.W) | 0; sy = 2; }
     else { sx = (host.rng() * w.W) | 0; sy = w.H - 3; }
     // denge turu: 6+pop*0.4+yıl*2 erken oyunda ezici bulundu — yumuşatıldı
-    const size = 4 + Math.round(host.pop() * 0.3) + Math.round(host.year() * 1.5);
+    const size = Math.max(3, Math.round(
+      (4 + host.pop() * 0.3 + host.year() * 1.5) * host.barbarMult(),
+    ));
     this.armies.push({
       id: this.nextAID++, owner: 'barbar',
       x: sx + 0.5, y: sy + 0.5, px: sx + 0.5, py: sy + 0.5,

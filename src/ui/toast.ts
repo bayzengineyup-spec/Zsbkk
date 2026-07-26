@@ -19,5 +19,6 @@ export function toast(msg: string, kind: '' | 'good' | 'bad' = ''): void {
     el.style.opacity = '0';
     setTimeout(() => el.remove(), 400);
   }, 3200);
-  while (box.children.length > 5) box.firstChild?.remove();
+  // Aşama 3: ekranda aynı anda en çok 3 bildirim — harita görünür kalsın
+  while (box.children.length > 3) box.firstChild?.remove();
 }

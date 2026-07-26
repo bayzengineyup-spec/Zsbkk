@@ -50,10 +50,11 @@ describe('Denge turu — otomatik oyuncu (25 dk)', () => {
       expect(r.gameOver === 'YENİLGİ').toBe(false);      // bot ölmemeli
       expect(r.tFarmReady).not.toBeNull();               // ekonomi kuruldu
       expect(r.tFarmReady!).toBeLessThan(3);             // tarla ilk 3 dk'da
+      // eşikler Aşama 3'ün UZUN inşa sürelerine göre (kullanıcı isteği G7)
       expect(r.tBread).not.toBeNull();                   // zincir kuruldu
-      expect(r.tBread!).toBeLessThan(15);
+      expect(r.tBread!).toBeLessThan(20);
       expect(r.tArmy20).not.toBeNull();                  // ordu toplandı
-      expect(r.tArmy20!).toBeLessThan(20);
+      expect(r.tArmy20!).toBeLessThan(22);
       expect(r.attacks).toBeGreaterThan(0);              // fetih girişimi var
       expect(r.endPop).toBeGreaterThan(5);               // köy büyüdü
     });

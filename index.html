@@ -75,10 +75,10 @@
     box-shadow: inset 0 1px 0 rgba(255,240,190,0.6), 0 2px 5px rgba(30,18,6,0.45);
   }
 
-  /* ---- üst şerit: ahşap kiriş ---- */
+  /* ---- üst şerit: ince ahşap kiriş (Aşama 3: harita görünsün) ---- */
   #topbar {
-    position: fixed; top: 0; left: 0; right: 0; height: 46px;
-    display: flex; align-items: center; gap: 5px; padding: 0 8px;
+    position: fixed; top: 0; left: 0; right: 0; height: 36px;
+    display: flex; align-items: center; justify-content: center; gap: 4px; padding: 0 6px;
     background-color: var(--wood);
     background-image: var(--tex-wood, linear-gradient(180deg, #57402a, #3a2a18));
     border-bottom: 2px solid var(--wood-edge);
@@ -87,27 +87,85 @@
     overflow-x: auto; scrollbar-width: none;
   }
   #topbar::-webkit-scrollbar { display: none; }
-  .brand {
-    font-weight: bold; letter-spacing: 1px; color: var(--gold); font-variant: small-caps;
-    font-size: 14px; margin-right: auto; text-shadow: 0 1px 3px #000; white-space: nowrap;
-  }
+  .brand { font-size: 14px; margin-right: 2px; text-shadow: 0 1px 3px #000; }
   .stat {
     display: flex; align-items: center; gap: 3px;
-    font-size: 11.5px; padding: 3px 7px; border-radius: 4px; white-space: nowrap;
+    font-size: 11px; padding: 2px 6px; border-radius: 4px; white-space: nowrap;
     background: rgba(18,10,5,0.55); border: 1px solid rgba(150,112,62,0.55); color: #c7b183;
     box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
   }
   .stat b { color: #f0e2c0; font-weight: 600; }
+  #top-toggle {
+    font-family: inherit; font-size: 12px; color: #c7b183; cursor: pointer;
+    background: rgba(18,10,5,0.55); border: 1px solid rgba(150,112,62,0.55);
+    border-radius: 4px; padding: 2px 8px; min-height: 24px;
+  }
+  #topmore {
+    position: fixed; top: 38px; left: 50%; transform: translateX(-50%);
+    display: none; gap: 4px; padding: 5px 8px; z-index: 19;
+    background: rgba(38,26,15,0.94); border: 1.5px solid var(--wood-edge);
+    border-radius: 0 0 8px 8px; flex-wrap: wrap; justify-content: center;
+    max-width: 96vw;
+  }
+  #topmore.show { display: flex; }
 
-  /* ---- mini harita: ahşap çerçeve ---- */
+  /* ---- köşe düğmeleri: harita + günlük (madalyon) ---- */
+  #cornerbtns {
+    position: fixed; right: 8px; top: 44px; z-index: 16;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .cbtn {
+    position: relative; width: 40px; height: 40px; border-radius: 50%;
+    font-size: 17px; cursor: pointer; font-family: inherit;
+    background: radial-gradient(circle at 35% 28%, #6d5030, #3a2814 68%, #241708);
+    border: 2px solid var(--wood-hi); color: #d5c193;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.5), inset 0 0 0 2px rgba(18,10,4,0.7);
+  }
+  .cbtn.on { border-color: var(--gold); }
+  #jbadge {
+    position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px;
+    border-radius: 8px; background: #a8342a; color: #fff; font-size: 10px;
+    font-weight: bold; display: none; align-items: center; justify-content: center;
+    padding: 0 4px; border: 1.5px solid #241708;
+  }
+  #jbadge.show { display: flex; }
+
+  /* ---- mini harita: varsayılan GİZLİ, düğmeyle açılır ---- */
   #minimap {
-    position: fixed; right: 8px; top: 54px; z-index: 15;
+    position: fixed; right: 54px; top: 44px; z-index: 15;
     width: 132px; height: 132px; border-radius: 4px;
     border: 3px solid var(--wood);
     outline: 1.5px solid var(--wood-edge);
     background: #0d0a07;
     box-shadow: 0 4px 16px rgba(0,0,0,0.55), inset 0 0 8px rgba(0,0,0,0.6);
+    display: none;
   }
+  #minimap.show { display: block; }
+
+  /* ---- olay günlüğü ---- */
+  #journalpanel {
+    position: fixed; left: 8px; right: 8px; bottom: 74px; z-index: 19;
+    padding: 10px; display: none; max-height: 46vh; overflow-y: auto;
+    background-color: var(--parch);
+    background-image: var(--tex-parchment, none);
+    color: var(--ink);
+    border: 2px solid var(--wood-edge); border-radius: 6px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,240,200,0.4), inset 0 0 30px rgba(90,60,20,0.26);
+  }
+  #journalpanel.show { display: block; }
+  #journalpanel h3 {
+    font-size: 12.5px; color: var(--ink-head); font-variant: small-caps;
+    letter-spacing: 1.2px; margin: 0 2px 8px; font-weight: bold;
+    border-bottom: 1.5px solid rgba(90,60,20,0.4); padding-bottom: 5px;
+  }
+  .jrow {
+    display: flex; gap: 7px; padding: 4px 2px; font-size: 11.5px;
+    border-bottom: 1px solid rgba(90,60,20,0.16); align-items: baseline;
+  }
+  .jrow .jt { color: var(--ink-dim); font-size: 10px; white-space: nowrap; }
+  .jrow.bad .jm { color: #7c2a1c; }
+  .jrow.good .jm { color: #3c5a22; }
+  .jempty { color: var(--ink-dim); font-size: 11.5px; padding: 8px 2px; }
 
   /* ---- karo bilgi kartı ---- */
   #tileinfo {
@@ -127,18 +185,18 @@
   /* ---- alt şerit: madalyon düğmeler ---- */
   #bottombar {
     position: fixed; bottom: 0; left: 0; right: 0;
-    display: flex; gap: 8px; padding: 8px 10px 12px; justify-content: center;
-    background: linear-gradient(0deg, rgba(20,12,6,0.92), rgba(20,12,6,0));
+    display: flex; gap: 7px; padding: 6px 10px 8px; justify-content: center;
+    background: linear-gradient(0deg, rgba(20,12,6,0.7), rgba(20,12,6,0));
     z-index: 20;
   }
   .btn {
-    width: 58px; height: 58px; padding: 0; flex: 0 0 auto;
+    width: 46px; height: 46px; padding: 0; flex: 0 0 auto;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
     border-radius: 50%;
     background: radial-gradient(circle at 35% 28%, #6d5030, #3a2814 68%, #241708);
     border: 2px solid var(--wood-hi);
-    color: #d5c193; font-size: 9px; cursor: pointer; font-family: inherit;
-    letter-spacing: 0.3px;
+    color: #d5c193; font-size: 7.5px; cursor: pointer; font-family: inherit;
+    letter-spacing: 0.2px;
     box-shadow:
       0 3px 9px rgba(0,0,0,0.6),
       inset 0 0 0 2px rgba(18,10,4,0.75),
@@ -155,7 +213,7 @@
       inset 0 0 0 3.5px rgba(217,164,65,0.45),
       inset 0 -6px 10px rgba(10,5,2,0.5);
   }
-  .btn .ic { font-size: 19px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
+  .btn .ic { font-size: 15px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
 
   /* ---- panel başlıkları ---- */
   #buildpanel h3, #diplopanel h3, #techpanel h3, #menupanel h3 {
@@ -252,17 +310,18 @@
 
   /* ---- etki çubuğu ---- */
   #efxbar {
-    position: fixed; top: 52px; left: 8px; z-index: 15;
+    position: fixed; top: 42px; left: 8px; z-index: 15;
     display: flex; flex-direction: column; gap: 4px; align-items: flex-start;
   }
   .efx { border-width: 1.5px; border-radius: 5px; padding: 3px 9px; font-size: 10.5px; color: var(--ink-dim); box-shadow: 0 2px 8px rgba(0,0,0,0.4), inset 0 0 12px rgba(90,60,20,0.2); }
   .efx b { color: var(--ink); }
 
-  /* ---- öğretici kutusu ---- */
+  /* ---- öğretici kutusu (kompakt çip — Aşama 3) ---- */
   #tutbox {
-    position: fixed; left: 8px; top: 96px; z-index: 14;
+    position: fixed; left: 8px; top: 76px; z-index: 14;
     border-color: #6a4a10;
-    padding: 8px 11px; max-width: 235px; display: none;
+    padding: 6px 9px; max-width: 205px; display: none;
+    opacity: 0.94;
   }
   #tutbox.show { display: block; }
   .tuthead { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
@@ -270,10 +329,11 @@
   .tuthead .ttl { font-size: 12.5px; color: var(--ink-head); font-weight: bold; font-variant: small-caps; letter-spacing: 0.4px; }
   .tuthead .tstep { margin-left: auto; font-size: 10px; color: var(--ink-dim); }
   .tuthead .tclose {
-    background: none; border: none; color: var(--ink-dim); font-size: 13px;
+    background: none; border: none; color: var(--ink-dim); font-size: 11px;
     cursor: pointer; padding: 2px 4px; font-family: inherit;
+    text-decoration: underline;
   }
-  .tuttext { font-size: 11px; color: var(--ink-dim); line-height: 1.45; }
+  .tuttext { font-size: 10.5px; color: var(--ink-dim); line-height: 1.4; }
 
   /* ---- menü paneli ---- */
   #menupanel {
@@ -299,11 +359,11 @@
 
   /* ---- bildirimler: parşömen şeritleri ---- */
   #toasts {
-    position: fixed; top: 54px; left: 50%; transform: translateX(-50%);
-    z-index: 30; display: flex; flex-direction: column; gap: 5px; align-items: center;
-    pointer-events: none; width: max-content; max-width: 90vw;
+    position: fixed; top: 44px; left: 50%; transform: translateX(-50%);
+    z-index: 30; display: flex; flex-direction: column; gap: 4px; align-items: center;
+    pointer-events: none; width: max-content; max-width: 86vw;
   }
-  .toast { border-radius: 5px; padding: 6px 13px; font-size: 12px; max-width: 90vw; }
+  .toast { border-radius: 5px; padding: 5px 11px; font-size: 11.5px; max-width: 86vw; }
   .toast.good { border-color: #3c5a28; }
   .toast.bad { border-color: #6a2418; }
 
@@ -392,22 +452,34 @@
 <div id="game"><canvas id="cv"></canvas></div>
 
 <div id="topbar">
-  <div class="brand">Krallıklar Çağı</div>
+  <div class="brand">👑</div>
   <div class="stat" title="Yiyecek">🍞 <b id="r-food">0</b></div>
   <div class="stat" title="Odun">🪵 <b id="r-wood">0</b></div>
   <div class="stat" title="Taş">🪨 <b id="r-stone">0</b></div>
   <div class="stat" title="Altın">🪙 <b id="r-gold">0</b></div>
+  <div class="stat" title="Nüfus / Kapasite">👥 <b id="r-pop">0/0</b></div>
+  <button id="top-toggle" title="Diğer kaynaklar">▾</button>
+</div>
+<div id="topmore">
   <div class="stat" title="Kereste">🪚 <b id="r-plank">0</b></div>
   <div class="stat" title="Ekmek">🥖 <b id="r-bread">0</b></div>
   <div class="stat" title="Bilgi">📜 <b id="r-know">0</b></div>
-  <div class="stat" title="Nüfus / Kapasite">👥 <b id="r-pop">0/0</b></div>
   <div class="stat" title="Ordu">⚔️ <b id="r-army">0</b></div>
   <div class="stat" title="Mutluluk">😊 <b id="r-happy">—</b></div>
   <div class="stat" title="Mevsim"><b id="r-season">—</b></div>
   <div class="stat" title="FPS"><b id="hud-fps">—</b></div>
 </div>
 
+<div id="cornerbtns">
+  <button class="cbtn" id="btn-map" title="Harita">🗺️</button>
+  <button class="cbtn" id="btn-journal" title="Olay Günlüğü">📜<span id="jbadge"></span></button>
+</div>
 <canvas id="minimap" width="132" height="132"></canvas>
+
+<div id="journalpanel">
+  <h3>📜 Olay Günlüğü</h3>
+  <div id="jlist"></div>
+</div>
 
 <div id="tileinfo">
   <h4 id="ti-name">—</h4>
@@ -491,11 +563,16 @@
   <p>Sisin ardında rakip krallıklar büyüyor. Köyünü kur, felaketlere hazırlan, diplomasiyi kullan. Oyun otomatik kaydedilir — kaldığın yerden devam edersin.</p>
   <div id="slots"></div>
   <div class="ctl">
-    <span style="font-size:11px;color:#8a744e">Yeni dünya boyutu:</span>
+    <span style="font-size:11px;color:#8a744e">Yeni dünya:</span>
     <select id="opt-size">
       <option value="128">Küçük · 128</option>
       <option value="192" selected>Orta · 192</option>
       <option value="256">Büyük · 256</option>
+    </select>
+    <select id="opt-diff" title="Zorluk">
+      <option value="rahat">🌿 Rahat</option>
+      <option value="normal" selected>⚖️ Normal</option>
+      <option value="zor">💀 Zor</option>
     </select>
   </div>
   <div id="loadmsg">Dünya üretiliyor…</div>

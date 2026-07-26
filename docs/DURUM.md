@@ -10,9 +10,25 @@
   sonsuz dünya istiyor, AI 20x, grafik hâlâ çocuksu, tutorial atlanabilir,
   inşa süreleri uzasın, başlangıç sissiz, sistemler 5x, animasyon, yeni
   içerik). Tümü plana madde madde işlendi + 15 maddelik kendi analizim.
-  **SIRADAKİ İŞ: AŞAMA 3 — Büyük Temizlik** (arayüz sadeleştirme,
-  nedene bağlı olay sistemi + olay günlüğü, sissiz geniş başlangıç,
-  atlanabilir tutorial, inşa süreleri +%50-75, zorluk seçimi).
+  **AŞAMA 3 — BÜYÜK TEMİZLİK TAMAMLANDI:**
+  - Arayüz: üst çubuk 4 kaynak+nüfus+▾ (gerisi açılır), minimap
+    varsayılan KAPALI (🗺️ düğmesi), 📜 rozetli OLAY GÜNLÜĞÜ paneli,
+    toast yalnız ACİL olaylar (URGENT sınıflandırıcı, en çok 3),
+    ince alt şerit (46px), kompakt öğretici çipi — ekran ≥%80 harita.
+  - Olay nedenselliği: ilk 5 dk hiçbir rastgele olay yok; "kayıp kervan"
+    SİLİNDİ; göç=ün(mutluluk≥60+yer), altın çağ=mutluluk≥72,
+    kahraman=savaş hâli; "sakin dönem" ağırlığı (4.2) felaket payının
+    şişmesini önler (bunsuz 25dk'da 10 yangın çıktı — ölçüldü, düzeltildi).
+  - Başlangıç: sissiz yarıçap 25→42; öğreticide "Atla" (kalıcı);
+    inşa süreleri ×1.6 (G7).
+  - Zorluk: rahat/normal/zor SİM İÇİNDE (DIFFICULTY tablosu: başlangıç
+    kaynağı/felaket/barbar çarpanları) — kayda ve replay'e girer; boot'ta
+    seçilir.
+  - Denge botu katmanlı işçi dağıtımı öğrendi (oduncu min 1 işçi —
+    "tarla her şeyi emiyor" kilidi çözüldü); eğri: zincir ~6.7dk,
+    fetih ~12dk, açlık 0. 111/111 test.
+  **Sıradaki: AŞAMA 4 — SES DEVRİMİ** (sentez çöpe; eylem başına gerçek
+  orta çağ sesi, ambiyans katmanları, konumsal ses, yeni müzik).
   Oynanabilir sürüm: https://claude.ai/code/artifact/cc19062c-708e-4c4c-9e9d-b25ce38dc3fd
 - **Aşama:** **FAZ 2 · M2 TAMAMLANDI** — görsel yenileme tüm dünya
   nesnelerine yayıldı: hayvanlar/askerler/kervanlar/AI başkentleri v2 +

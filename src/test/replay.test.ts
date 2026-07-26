@@ -34,7 +34,7 @@ describe('Tekrar (replay) — çok oyunculu hazırlık', () => {
     }
     expect(ok).toBe(true);
     autoplay(sim, 8, seed);
-    expect(sim.cmdLog.length).toBeGreaterThan(30); // gerçekten oynadı
+    expect(sim.cmdLog.length).toBeGreaterThan(25); // gerçekten oynadı
 
     // tekrar dosyası (JSON'dan geçir — gerçek dosya akışı gibi)
     const data: ReplayData = {

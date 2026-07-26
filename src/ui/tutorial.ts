@@ -91,8 +91,16 @@ export function renderTutorial(): void {
     `<div class="tuthead"><span class="tic">${s.icon}</span>`
     + `<span class="ttl">${s.title}</span>`
     + `<span class="tstep">${Tut.step + 1}/${TUT_STEPS.length}</span>`
-    + `<button class="tclose" id="tut-x">✕</button></div>`
+    + `<button class="tclose" id="tut-skip" title="Öğreticiyi tamamen atla">Atla</button>`
+    + `<button class="tclose" id="tut-x" title="Gizle">✕</button></div>`
     + `<div class="tuttext">${s.text}</div>`;
   const x = document.getElementById('tut-x');
   if (x) x.onclick = () => { Tut.hidden = true; renderTutorial(); };
+  const sk = document.getElementById('tut-skip');
+  if (sk) {
+    sk.onclick = () => {
+      Tut.done = true; // kalıcı atlama — kayda da yazılır
+      renderTutorial();
+    };
+  }
 }

@@ -42,6 +42,8 @@ export interface EventHost {
   spawnBarbarians(): boolean;
   /** Kışla var mı (kahraman olayı şartı) */
   hasBarracks(): boolean;
+  /** Oyuncu şu an bir krallıkla savaşta mı (kahraman olayı nedeni) */
+  atWar(): boolean;
   /** Orduya asker kat (kahraman olayı — mızrakçı olarak) */
   addSoldiers(n: number): void;
   /** Felaket risk çarpanı (sağlam yapı teknolojisi ile 0.5) */
@@ -161,37 +163,35 @@ export class EventSystem {
     return true;
   }
 
-  // ---------- iyi olaylar ----------
+  // ---------- iyi olaylar (HEPSİ NEDENLİ — Aşama 3 / G12) ----------
+  /** Altın çağ: yalnız uzun süredir yüksek mutlulukta tetiklenir. */
   eventGoldenAge(): boolean {
+    if (this.host.happy() < 72) return false;
     this.addEffect('golden', 'Altın Çağ', '✨', 50, { prodMult: 1.6 });
-    this.host.toast('✨ ALTIN ÇAĞ! Tüm üretim arttı.', 'good');
+    this.host.toast('✨ ALTIN ÇAĞ! Mutlu halkın coşkusu üretime yansıyor.', 'good');
     this.host.addHappy(15);
     return true;
   }
 
+  /** Göç: köyün ÜNÜ (mutluluk + boş yer) duyulursa gelir — nedensiz değil. */
   eventMigration(): boolean {
     const room = this.host.popCap() - this.host.pop();
-    if (room <= 0) return false;
+    if (room <= 0 || this.host.happy() < 60) return false;
     const n = Math.min(room, 2 + ((this.host.rng() * 3) | 0));
     this.host.addPop(n);
-    this.host.toast(`🚶 GÖÇ! ${n} kişi köyüne sığındı.`, 'good');
+    this.host.toast(`🚶 Köyünün ünü yayıldı — ${n} kişi göç edip sığındı.`, 'good');
     return true;
   }
 
-  eventCaravan(): boolean {
-    const g = 40 + ((this.host.rng() * 60) | 0);
-    const w = 30 + ((this.host.rng() * 50) | 0);
-    this.host.addRes('gold', g);
-    this.host.addRes('wood', w);
-    this.host.toast(`🐪 Kayıp kervan buldun: +${g} altın, +${w} odun.`, 'good');
-    return true;
-  }
+  // NOT: "kayıp kervan" olayı SİLİNDİ (Aşama 3 / G12) — hiçbir nedene
+  // bağlanamayan bedava kaynak yağmuru oyunu ucuzlatıyordu.
 
+  /** Kahraman: yalnız SAVAŞ hâlindeyken davaya katılır. */
   eventHero(): boolean {
-    if (!this.host.hasBarracks()) return false;
+    if (!this.host.hasBarracks() || !this.host.atWar()) return false;
     const n = 4 + ((this.host.rng() * 4) | 0);
     this.host.addSoldiers(n);
-    this.host.toast(`⭐ KAHRAMAN! ${n} savaşçı davana katıldı.`, 'good');
+    this.host.toast(`⭐ Savaş çığlığını duyan bir kahraman ${n} savaşçıyla katıldı!`, 'good');
     this.host.addHappy(8);
     return true;
   }
@@ -203,33 +203,36 @@ export class EventSystem {
     const pool: { w: number; fn: () => boolean }[] = [];
     const push = (w: number, fn: () => boolean) => { if (w > 0) pool.push({ w, fn }); };
 
-    // ERKEN OYUN KORUMASI (denge turu bulgusu): ilk 3 dakika felaket yok —
-    // oyuncu köyünü kurmadan yıkım başlamasın
-    const early = this.host.time() < 180;
+    // ERKEN OYUN SESSİZLİĞİ (Aşama 3 / G12): ilk 5 dakika HİÇBİR rastgele
+    // olay yok — oyun başında yalnız oyuncunun kendi eylemleri konuşur
+    if (this.host.time() < 300) return;
 
     // felaketler — koşullu ağırlık
-    if (!early) {
-      push(this.woodenRatio() * s.fire * 1.7 * this.host.disasterMult(), () => this.eventFire());
-      push(this.crowding() * 1.6 * (this.hasEffect('plague') ? 0 : 1), () => this.eventPlague());
-      push(0.5 * this.host.disasterMult(), () => this.eventEarthquake());
-      push(this.woodenRatio() * 1.0, () => this.eventStorm());
-      push(s.key === 'kis' && !this.hasEffect('harsh') ? 2.2 : 0, () => this.eventHarshWinter());
-      // barbarlar: 2. yıldan itibaren + akınlar arası en az 3 dakika
-      const barbarOk = this.host.year() >= 2
-        && this.host.time() - this.lastBarbar >= 180;
-      push(barbarOk ? 1.1 : 0, () => {
-        const ok = this.host.spawnBarbarians();
-        if (ok) this.lastBarbar = this.host.time();
-        return ok;
-      });
-      push(this.host.happy() < 25 ? 3.0 : 0, () => this.eventRebellion());
-    }
+    push(this.woodenRatio() * s.fire * 1.7 * this.host.disasterMult(), () => this.eventFire());
+    push(this.crowding() * 1.6 * (this.hasEffect('plague') ? 0 : 1), () => this.eventPlague());
+    push(0.5 * this.host.disasterMult(), () => this.eventEarthquake());
+    push(this.woodenRatio() * 1.0, () => this.eventStorm());
+    push(s.key === 'kis' && !this.hasEffect('harsh') ? 2.2 : 0, () => this.eventHarshWinter());
+    // barbarlar: 2. yıldan itibaren + akınlar arası en az 3 dakika
+    const barbarOk = this.host.year() >= 2
+      && this.host.time() - this.lastBarbar >= 180;
+    push(barbarOk ? 1.1 : 0, () => {
+      const ok = this.host.spawnBarbarians();
+      if (ok) this.lastBarbar = this.host.time();
+      return ok;
+    });
+    push(this.host.happy() < 25 ? 3.0 : 0, () => this.eventRebellion());
 
-    // iyi olaylar
-    push(this.host.happy() > 60 ? 1.6 : 0.5, () => this.eventGoldenAge());
-    push(this.host.popCap() > this.host.pop() ? 1.5 : 0, () => this.eventMigration());
-    push(1.2, () => this.eventCaravan());
-    push(this.host.hasBarracks() ? 1.0 : 0, () => this.eventHero());
+    // iyi olaylar — hepsi koşullu (nedensiz iyilik de spam'dir)
+    push(this.host.happy() >= 72 ? 1.4 : 0, () => this.eventGoldenAge());
+    push(this.host.popCap() > this.host.pop() && this.host.happy() >= 60 ? 1.5 : 0,
+      () => this.eventMigration());
+    push(this.host.hasBarracks() && this.host.atWar() ? 1.0 : 0, () => this.eventHero());
+
+    // SAKİN DÖNEM: çoğu zaman kayda değer bir şey OLMAZ. Bu ağırlık,
+    // koşullu olaylar kapandığında felaketlerin göreli payının şişmesini
+    // önler — felaket sıklığı mutlak kalır (Aşama 3 dengesi).
+    push(4.2, () => true);
 
     const total = pool.reduce((a, p) => a + p.w, 0);
     if (total <= 0) return;

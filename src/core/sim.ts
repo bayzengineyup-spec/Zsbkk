@@ -98,8 +98,23 @@ export interface GameOver {
   stats: { minutes: number; year: number; pop: number; buildings: number; reputation: number; kingdomsLeft: number };
 }
 
+/* ---- zorluk (Aşama 3 / M3.4): sim'in İÇİNDE — determinizm ve tekrar
+   için kayda ve replay verisine girer ---- */
+export type Difficulty = 'rahat' | 'normal' | 'zor';
+export const DIFFICULTY: Record<Difficulty, {
+  name: string; icon: string;
+  /** başlangıç kaynağı çarpanı */ startRes: number;
+  /** felaket sıklığı çarpanı */ disaster: number;
+  /** barbar akını boyut çarpanı */ barbar: number;
+}> = {
+  rahat: { name: 'Rahat', icon: '🌿', startRes: 1.5, disaster: 0.6, barbar: 0.7 },
+  normal: { name: 'Normal', icon: '⚖️', startRes: 1, disaster: 1, barbar: 1 },
+  zor: { name: 'Zor', icon: '💀', startRes: 0.75, disaster: 1.4, barbar: 1.3 },
+};
+
 export class Sim {
   readonly world: World;
+  readonly difficulty: Difficulty;
   player: PlayerState;
   villagers: Villager[] = [];
   time: TimeState = { t: 0, seasonIdx: 0, year: 1 };
@@ -126,12 +141,15 @@ export class Sim {
   /** toplam tick sayısı — komut kaydı/tekrar hizalaması (Faz 5) */
   tickCount = 0;
 
-  constructor(world: World) {
+  constructor(world: World, difficulty: Difficulty = 'normal') {
     this.world = world;
+    this.difficulty = difficulty;
     this.rng = makeRNG((world.seed ^ 0x5f3a9c1) >>> 0);
+    const sr = DIFFICULTY[difficulty].startRes;
     this.player = {
       res: {
-        food: 120, wood: 150, stone: 60, gold: 30, know: 0,
+        food: Math.round(120 * sr), wood: Math.round(150 * sr),
+        stone: Math.round(60 * sr), gold: Math.round(30 * sr), know: 0,
         plank: 0, flour: 0, bread: 0,
       },
       pop: 5,
@@ -178,8 +196,9 @@ export class Sim {
       toast: (msg, kind) => this.toast(msg, kind ?? ''),
       spawnBarbarians: () => this.military.barbarianRaid(),
       hasBarracks: () => this.hasBarracks(),
+      atWar: () => this.kingdoms.kingdoms.some(k => k.status === 'war'),
       addSoldiers: (n) => { this.player.units.spear += n; },
-      disasterMult: () => this.tech.disaster(),
+      disasterMult: () => this.tech.disaster() * DIFFICULTY[this.difficulty].disaster,
     };
     this.events = new EventSystem(eventHost);
 
@@ -232,6 +251,7 @@ export class Sim {
       changeReputation: (d, r) => this.changeReputation(d, r),
       year: () => this.time.year,
       toast: (msg, kind) => this.toast(msg, kind ?? ''),
+      barbarMult: () => DIFFICULTY[this.difficulty].barbar,
       igniteRandomBuilding: () => {
         // yağmacılar bir binayı ateşe verir (sur hariç — taş yanmaz)
         const list = this.player.buildings.filter(b =>
@@ -958,6 +978,7 @@ export class Sim {
       popGrowAcc: this.popGrowAcc,
       fogAcc: this.fogAcc,
       tickCount: this.tickCount,
+      difficulty: this.difficulty,
       player: this.player,
       villagers: this.villagers,
       time: this.time,
@@ -982,7 +1003,7 @@ export class Sim {
       wildlife: unknown; caravans: unknown;
       gameOver: GameOver | null; vis: number[]; lastVisible: number[];
     };
-    const sim = new Sim(world);
+    const sim = new Sim(world, (d as { difficulty?: Difficulty }).difficulty ?? 'normal');
     sim.rng.setState(d.rngState);
     sim.nextVID = d.nextVID;
     sim.starveAcc = d.starveAcc;
