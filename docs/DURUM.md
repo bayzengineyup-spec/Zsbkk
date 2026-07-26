@@ -22,8 +22,10 @@
   **FAZ 4 · M2 de TAMAM:** meydan savaşları artık süreli (4sn) ve haritada
   izleniyor — toz bulutu, çarpışan iki taraf, kıvılcımlar, çift sancak.
   103 test yeşil.
-  Sırada: PWA (ana ekrana ekle + çevrimdışı açılış) veya Faz 4 M3
-  (kuşatma/savunma derinliği) — kullanıcıya göre.
+  **PWA de TAMAM:** manifest + kale ikonları + service worker; telefonda
+  "ana ekrana ekle" ve tam ÇEVRİMDIŞI açılış çalışıyor (testli).
+  Sırada: Faz 4 M3 (kuşatma/savunma derinliği), zafer/ilerleme dengesi
+  turu veya çok oyunculu hazırlık — kullanıcıya göre.
 - **Sürüm:** v0.7 (Faz 2 M2) · referans: `prototype/kralliklar-cagi-v0.5.html`.
 - **Son güncelleme:** 2026-07-26 (2. oturum).
 - **Bilinçli ertelenenler:** WebGL atlas / chunk bake (Canvas2D ~42-56 fps
@@ -31,6 +33,19 @@
   ikon çizimleri (Faz 2 M3), kayıt slotları/IndexedDB/çevrimdışı (Faz 3).
 
 ## ✅ Tamamlanan
+### PWA — Ana Ekrana Ekle + Çevrimdışı (2. oturum)
+- **Manifest (`public/manifest.webmanifest`):** ad, standalone görünüm,
+  tema renkleri (ahşap koyu), TR dili, oyun kategorisi.
+- **İkonlar:** oyunun sanat yönünde üretilmiş taş kale ikonu (mazgal,
+  sıcak pencereler, altın-kızıl bayrak, ahşap çerçeve) — 192/512 +
+  maskable varyant (`public/icons/`, Chromium canvas ile üretildi).
+- **Service worker (`public/sw.js`):** gezinmede ağ-öncelikli (çevrimdışı
+  → kabuk), varlıklarda önbellek-öncelikli + arka planda tazeleme
+  (Vite hash'li adlarla güvenli); sürümlü önbellek temizliği. Kayıtlar
+  IndexedDB'de olduğundan SW'den bağımsız güvende. Kayıt yalnız PROD.
+- **iOS metaları:** apple-touch-icon, tam ekran, durum çubuğu.
+- **Test:** Playwright — manifest ✓, SW activated ✓, **çevrimdışı
+  yeniden yükleme ✓** (boot ekranı açılıyor). 103/103 vitest yeşil.
 ### FAZ 4 · M2 — Savaş Görselleştirme (2. oturum)
 - **Süreli meydan savaşı:** ordu hedefe varınca savaş ANINDA çözülmez —
   `Army.fighting = BATTLE_TIME (4sn)` başlar, süre bitince mevcut savaş

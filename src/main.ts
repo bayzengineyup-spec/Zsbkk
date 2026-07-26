@@ -945,3 +945,11 @@ function loop(t: number): void {
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+
+// ---------- PWA: service worker (yalnız üretim derlemesinde) ----------
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .catch(() => { /* SW yoksa da oyun normal çalışır */ });
+  });
+}
