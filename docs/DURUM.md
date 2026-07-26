@@ -163,14 +163,19 @@
 - Master plan yazıldı: `docs/00`…`docs/12` + bu DURUM dosyası.
 - Prototip repoya alındı (`prototype/`).
 
-## 🔜 Sıradaki adım — kullanıcı tercihi
-FAZ 1 bitti. İki güçlü aday (docs/11-YOL-HARITASI):
-- **FAZ 2 — Grafik & Sanat:** gerçek dokular HER ÖĞE İÇİN AYRI AYRI
-  (kullanıcının açık talebi), boyut/oran standardı, iskelet animasyonları,
-  doku denetimi. Oyunun "çizgi film" görünümü burada çözülür.
-- **FAZ 3 — Kayıt & Devamlılık genişletmesi:** kayıt slotları, IndexedDB,
-  çevrimdışı ilerleme ("sen yokken +320 odun"), migrasyon altyapısı.
-Varsayılan öneri: FAZ 2 (görsel etki en yüksek).
+## 🔜 Sıradaki adım — SANAT YÖNÜ SEÇİMİ (kullanıcıda)
+FAZ 2 başladı. Kullanıcının talimatı: grafik/animasyon EN ÖNEMLİ konu ve
+**arayüz de seçilen stile uymalı** (parşömen/ahşap/demir çerçeve; web butonu
+görünümü YASAK). Karar için 6 sanat yönü konsepti üretildi
+(docs/concepts/stil-mockup.html — ?style=1..6):
+1. Elle Boyanmış Orta Çağ (parşömen+ahşap UI)
+2. HD Piksel Sanatı (taş blok UI)
+3. Minyatür Dünya / Kil (yumuşak krem UI)
+4. Mürekkep & Parşömen (el yazması UI)
+5. Sert Kuzey / Karanlık Gerçekçi (demir+perçin UI)
+6. Canlı Stilize / Boyalı Fantezi (cilalı ahşap+altın UI)
+Kullanıcı stil seçince: seçilen stil tüm karo/bina/köylü/hayvan/ordu
+dokularına + UI'ya (index.html teması) uygulanacak. Her öğe için AYRI doku.
 
 ## 🧠 Karar günlüğü (neden böyle?)
 - **HTML prototipi temel alındı** çünkü gerçek WebGL grafik motoru ve canlı
