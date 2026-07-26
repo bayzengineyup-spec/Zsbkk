@@ -1,6 +1,0 @@
-{
-  "name": "Kingdoms Rise 2D",
-  "description": "2D kuşbakışı krallık kurma ve gerçek zamanlı askeri fetih strateji oyunu. Kaynak toplama, asker eğitme, haritada gerçek zamanlı savaşlar ve Gemini yapay zeka danışmanı içerir.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
