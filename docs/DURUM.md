@@ -4,12 +4,33 @@
 > her oturum sonunda güncellenir. "Neredeydik, ne yaptık, sırada ne var?"
 
 ## 📍 Şu an
-- **Aşama:** **Faz 0 — M2 tamamlandı** (Köy Kurma çalışıyor). Sırada M3:
-  olay/felaket sistemi + krallıklar/diplomasi + sis + kayıt portu.
-- **Sürüm:** v0.6-M2 (modüler) · referans: `prototype/kralliklar-cagi-v0.5.html`.
+- **Aşama:** **Faz 0 — M3 tamamlandı** (Canlı Dünya: olaylar, krallıklar,
+  diplomasi, sis, otomatik kayıt). Sırada M4: askeri sistem + teknoloji +
+  zafer/yenilgi → Faz 0 kapanışı.
+- **Sürüm:** v0.6-M3 (modüler) · referans: `prototype/kralliklar-cagi-v0.5.html`.
 - **Son güncelleme:** 2026-07-26 (2. oturum).
 
 ## ✅ Tamamlanan
+### Faz 0 · M3 — Canlı Dünya (2. oturum, devam)
+- **Olay/felaket sistemi** (`core/events.ts`): koşullu yangın (yayılır,
+  söndürülür — komutla), veba (süreli can kaybı), deprem, kasırga, sert kış,
+  isyan + iyi olaylar (altın çağ, göç, kervan). Etki çarpanları (prodMult/
+  foodMult) ekonomiye bağlı. Barbar akını + kahraman olayı M4'te (ordu şart).
+- **AI krallıklar + diplomasi** (`core/kingdoms.ts` + `data/personalities.ts`):
+  8 kişilik, kendi kendine büyüme/genişleme, elçiler, ilişki/itibar/güç,
+  hediye-ticaret-ittifak-ateşkes-haraç-casus-savaş eylemleri (hepsi komutla),
+  sinsi ihaneti, AI'ların birbiriyle savaşı, krallık yıkımı.
+- **Sis (keşif):** 0/1/2 seviyeli görüş; başlangıç vadisi seçimi
+  (pickStartRegion) + yumuşak açılış; bina/köylü görüş yarıçapı; görülmemiş
+  karo çizilmez, keşfedilmiş loş çizilir; minimap sis + krallık toprakları.
+- **KAYIT — "kaldığın yerden devam" ✔:** Sim tam serialize/restore (RNG durumu
+  dahil), sürümlü format; localStorage otomatik kayıt (20sn aralık + arka
+  plana geçişte + önemli eylemde); açılışta **▶ Devam Et**. Tarayıcı testi:
+  yenile → devam → aynı tohum/durum.
+- **Render:** sis örtüsü, krallık toprağı tonu + başkent işareti (yer tutucu),
+  yanan bina alev/duman animasyonu; aktif etki çubuğu (HUD).
+- **Testler: 47/47 yeşil** — kritik: `serialize → restore → devam ==
+  kesintisiz devam (birebir)` determinizm kanıtı.
 ### Faz 0 · M2 — Köy Kurma (2. oturum, devam)
 - **Komut deseni kuruldu:** UI sim'i asla doğrudan değiştirmez —
   `core/commands.ts` → `Sim.applyCommand` (place/assign/upgradeCenter/demolish).
@@ -57,18 +78,19 @@
 - Master plan yazıldı: `docs/00`…`docs/12` + bu DURUM dosyası.
 - Prototip repoya alındı (`prototype/`).
 
-## 🔜 Sıradaki adım (Faz 0 · M3)
-1. Olay/felaket sistemi portu (koşullu yangın/veba/deprem/fırtına + iyi olaylar;
-   yangın yayılma/söndürme).
-2. AI krallıklar + diplomasi portu (kişilikler, büyüme, ilişki, elçi).
-3. Sis (keşif) sistemi portu.
-4. Kayıt/yükleme (yeni format: tohum + durum; IndexedDB Faz 3'te, önce
-   localStorage MVP).
-5. Sonra: askeri sistem, teknoloji, zafer/yenilgi → Faz 0 biter.
+## 🔜 Sıradaki adım (Faz 0 · M4 — Faz 0 kapanışı)
+1. Askeri sistem: kışlada asker eğitimi, birim türleri (mızrakçı/okçu/süvari),
+   haritada yürüyen ordular, barbar akını + kahraman olayı, savunma/sur.
+2. Teknoloji ağacı (4 dal, 16 teknoloji) + akademi bilgi üretimiyle bağ.
+3. Komutanlar (yetenek + seviye).
+4. Zafer/yenilgi koşulları + son ekran.
+5. Ses motoru portu (sentez) — opsiyonel, M4 sonu.
 - Not: Görseller (karo + bina) bilinçli yer tutucu — **gerçek dokular Faz 2'de
   her öğe için ayrı ayrı üretilecek** (kullanıcının açık talebi).
 - Not: WebGL atlas motoru henüz taşınmadı; Canvas2D sprite yolu 60 fps veriyor,
   sprite sayısı artınca geçilecek.
+- Not: Kayıt şimdilik tek slot (localStorage). Slotlar + IndexedDB + çevrimdışı
+  ilerleme Faz 3'te (docs/10-KAYIT).
 
 ## 🧠 Karar günlüğü (neden böyle?)
 - **HTML prototipi temel alındı** çünkü gerçek WebGL grafik motoru ve canlı
@@ -85,6 +107,10 @@
 - Ekonomi zinciri kaç adım derin olacak.
 
 ## 📝 Oturum notları
+- **2026-07-26 (2c):** Faz 0 M3 bitti — olaylar/felaketler, AI krallıklar +
+  tam diplomasi, sis, otomatik kayıt + Devam Et. 47 test yeşil; tarayıcıda
+  yenile→devam doğrulandı. Kullanıcının "her açtığında hatırlasın" isteği
+  çalışır durumda (MVP).
 - **2026-07-26 (2b):** Faz 0 M2 bitti — komut desenli sim çekirdeği (ekonomi,
   köylüler, mevsim), inşa akışı (hayalet+kurallar), yer tutucu bina/köylü
   render'ı, HUD/toast. 31 test yeşil, duman testi 60 fps.

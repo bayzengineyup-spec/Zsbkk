@@ -11,9 +11,13 @@ import { Camera, type Viewport } from './render/camera';
 import { buildTileSprites } from './render/tiles';
 import { buildBuildingSprites } from './render/buildings';
 import { drawScene, type Frame, type Ghost, type RenderStats, type TileSel } from './render/scene';
-import { buildMinimapCache, drawMinimap } from './render/minimap';
+import { MiniMap } from './render/minimap';
 import { TouchInput } from './ui/input';
 import { initToasts, toast } from './ui/toast';
+import { saveNow, hasSave, restoreGame } from './ui/persist';
+import {
+  initDiplo, openDiploPanel, closeDiploPanel, refreshDiploPanel, diploOpen,
+} from './ui/diplo';
 
 function el<T extends HTMLElement>(id: string): T {
   const e = document.getElementById(id);
@@ -49,7 +53,7 @@ const tileSprites = buildTileSprites();
 const bSprites = buildBuildingSprites();
 let world: World | null = null;
 let sim: Sim | null = null;
-let mmCache: HTMLCanvasElement | null = null;
+let minimap: MiniMap | null = null;
 let sel: TileSel | null = null;
 let ghost: Ghost | null = null;
 const stats: RenderStats = { tiles: 0, sprites: 0 };
@@ -75,6 +79,11 @@ function refreshHUD(): void {
   el('r-happy').textContent = `%${Math.round(p.happy)}`;
   const s = sim.currentSeason();
   el('r-season').textContent = `${s.icon} ${s.name} · ${sim.time.year}. yıl`;
+  // aktif etkiler (veba, sert kış, altın çağ…)
+  el('efxbar').innerHTML = sim.events.activeEffects
+    .map(e => `<div class="efx">${e.icon} <b>${e.name}</b> · ${Math.ceil(e.timer)}sn</div>`)
+    .join('');
+  refreshDiploPanel();
 }
 
 // ---------- karo bilgi kartı ----------
@@ -94,15 +103,22 @@ function refreshTileInfo(): void {
 
   if (b && sim) {
     const def = BUILDINGS[b.type];
-    el('ti-name').textContent = `${def.icon} ${def.name} · sv ${b.level}`;
+    el('ti-name').textContent = `${def.icon} ${def.name} · sv ${b.level}${b.burning ? ' 🔥' : ''}`;
     el('ti-l1').textContent = def.desc;
     el('ti-l2').textContent = def.maxWorkers
       ? `İşçi: ${b.workers}/${def.maxWorkers} · Boşta: ${sim.player.idle}`
       : '';
-    el('ti-l3').textContent = '';
+    el('ti-l3').textContent = b.burning ? `Sağlamlık: ${Math.max(0, Math.round(b.hp ?? 100))}/100` : '';
     act.innerHTML = '';
     act.style.display = 'flex';
 
+    if (b.burning) {
+      const ext = document.createElement('button');
+      ext.textContent = '🪣 Söndür';
+      ext.disabled = sim.player.idle <= 0;
+      ext.onclick = () => { sim!.applyCommand({ kind: 'extinguish', x: gx, y: gy }); refreshTileInfo(); };
+      act.append(ext);
+    }
     if (def.maxWorkers > 0) {
       const minus = document.createElement('button');
       minus.textContent = '− işçi';
@@ -214,6 +230,7 @@ function confirmPlace(): void {
     cancelPlace();
     if (wasCenter) hint(null);
     refreshHUD();
+    saveNow(sim); // önemli eylem sonrası anında kayıt
   } else {
     updateGhostValidity();
   }
@@ -272,10 +289,24 @@ mm.addEventListener('pointerdown', (e) => {
 });
 
 // ---------- alt şerit ----------
-el('b-explore').onclick = () => { cancelPlace(); closeBuildPanel(); };
+const bDiplo = el<HTMLElement>('b-diplo');
+
+function closeDiplo(): void {
+  closeDiploPanel();
+  bDiplo.classList.remove('on');
+}
+
+el('b-explore').onclick = () => { cancelPlace(); closeBuildPanel(); closeDiplo(); };
 bBuild.onclick = () => {
   if (buildpanel.classList.contains('show')) closeBuildPanel();
-  else { cancelPlace(); openBuildPanel(); }
+  else { cancelPlace(); closeDiplo(); openBuildPanel(); }
+};
+bDiplo.onclick = () => {
+  if (diploOpen) closeDiplo();
+  else {
+    cancelPlace(); closeBuildPanel();
+    openDiploPanel(); bDiplo.classList.add('on');
+  }
 };
 el('b-center').onclick = () => {
   if (!world || !sim) return;
@@ -284,44 +315,115 @@ el('b-center').onclick = () => {
   haptic(10);
 };
 el('b-new').onclick = () => {
+  if (sim) saveNow(sim); // mevcut oyunu kaybetme
   el('boot').style.display = 'flex';
-  world = null; sim = null; mmCache = null;
-  cancelPlace(); closeBuildPanel(); hideInfo();
+  refreshBootButtons();
+  world = null; sim = null; minimap = null;
+  cancelPlace(); closeBuildPanel(); closeDiplo(); hideInfo();
 };
 
+// diplomasi paneli bağlantısı
+initDiplo({
+  panel: el('diplopanel'),
+  list: el('diplolist'),
+  getSim: () => sim,
+  onAction: (kingdomId, action) => {
+    if (!sim) return;
+    sim.applyCommand({ kind: 'diplo', kingdomId, action });
+    haptic(12);
+    refreshHUD();
+  },
+  onGoto: (x, y) => {
+    if (!world) return;
+    cam.focusOn(x, y, world);
+    closeDiplo();
+    haptic(10);
+  },
+});
+
 // ---------- dünya kurulumu ----------
+function finishSetup(focusX: number, focusY: number): void {
+  if (!world || !sim) return;
+  minimap = new MiniMap(world);
+  sel = null; ghost = null;
+  hideInfo();
+  el('opt-seed').textContent = String(world.seed);
+  cam.zoom = 1.1;
+  cam.x = 0; cam.y = 0;
+  cam.focusOn(focusX, focusY, world);
+  el('boot').style.display = 'none';
+  el<HTMLElement>('loadmsg').style.display = 'none';
+  refreshHUD();
+}
+
 function startGame(size: number): void {
-  const loadmsg = el<HTMLElement>('loadmsg');
-  loadmsg.style.display = 'block';
+  el<HTMLElement>('loadmsg').style.display = 'block';
   setTimeout(() => {
     const seed = (Math.random() * 1e9) | 0; // yalnız tohum üretimi — sim dışı
     world = new World(size, size, seed);
     sim = new Sim(world);
-    mmCache = buildMinimapCache(world);
-    sel = null; ghost = null;
-    hideInfo();
-    el('opt-seed').textContent = String(seed);
-    cam.zoom = 1.1;
-    cam.x = 0; cam.y = 0;
-    cam.focusOn(size / 2, size / 2, world);
-    el('boot').style.display = 'none';
-    loadmsg.style.display = 'none';
-    refreshHUD();
-    // ilk görev: köy meydanı yerleştir
+    // rakip krallıklar (boyuta göre) + başlangıç vadisi
+    const kc = size <= 192 ? (size <= 128 ? 6 : 6) : size <= 256 ? 9 : 13;
+    sim.kingdoms.spawn(kc);
+    const spot = sim.pickStartRegion();
+    sim.revealStartArea(spot.x, spot.y, 25);
+    finishSetup(spot.x, spot.y);
+    // ilk görev: köy meydanı yerleştir (hayalet başlangıç vadisinde)
     enterPlace('center');
+    if (ghost) {
+      (ghost as Ghost).gx = spot.x;
+      (ghost as Ghost).gy = spot.y;
+      updateGhostValidity();
+    }
     hint('Köy meydanını kurmak için bir yer seç');
   }, 30);
+}
+
+function continueGame(): void {
+  el<HTMLElement>('loadmsg').style.display = 'block';
+  setTimeout(() => {
+    const r = restoreGame();
+    if (!r) {
+      toast('Kayıt okunamadı — yeni oyun başlat.', 'bad');
+      el<HTMLElement>('loadmsg').style.display = 'none';
+      return;
+    }
+    world = r.world;
+    sim = r.sim;
+    const c = sim.villageCenter();
+    finishSetup(c.x, c.y);
+    if (!sim.player.hasCenter) {
+      enterPlace('center');
+      hint('Köy meydanını kurmak için bir yer seç');
+    } else {
+      toast('▶ Kaldığın yerden devam ediyorsun.', 'good');
+    }
+  }, 30);
+}
+
+function refreshBootButtons(): void {
+  el<HTMLElement>('opt-continue').style.display = hasSave() ? '' : 'none';
 }
 
 el<HTMLButtonElement>('opt-play').onclick = () => {
   startGame(parseInt(el<HTMLSelectElement>('opt-size').value, 10));
 };
+el<HTMLButtonElement>('opt-continue').onclick = continueGame;
+refreshBootButtons();
+
+// ---------- otomatik kayıt ----------
+// aralıklı + uygulama arka plana geçince (docs/10-KAYIT)
+setInterval(() => { if (sim) saveNow(sim); }, 20000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && sim) saveNow(sim);
+});
+window.addEventListener('pagehide', () => { if (sim) saveNow(sim); });
 
 // ---------- döngü ----------
 const SIM_HZ = 10, SIM_STEP = 1 / SIM_HZ;
 let simAcc = 0;
 let lastT = 0;
-let fpsFrames = 0, fpsAcc = 0, hudAcc = 0;
+let fpsFrames = 0, fpsAcc = 0, hudAcc = 0, renderT = 0;
 
 function loop(t: number): void {
   if (!lastT) lastT = t;
@@ -329,9 +431,10 @@ function loop(t: number): void {
   lastT = t;
   if (!isFinite(dt) || dt < 0) dt = 0;
   if (dt > 0.25) dt = 0.25;
+  renderT += dt;
 
   let alpha = 1;
-  if (sim && world && mmCache) {
+  if (sim && world && minimap) {
     // sabit zaman adımı — determinizmin şartı
     simAcc += dt;
     let guard = 0;
@@ -348,10 +451,10 @@ function loop(t: number): void {
     const frame: Frame = {
       ctx, world, cam, view,
       tileSprites, bSprites,
-      sim, sel, ghost, alpha, stats,
+      sim, sel, ghost, alpha, t: renderT, stats,
     };
     drawScene(frame);
-    drawMinimap(mmx, mmCache, world, cam, view);
+    minimap.draw(mmx, cam, view, sim, dt);
 
     hudAcc += dt;
     if (hudAcc >= 0.25) { hudAcc = 0; refreshHUD(); }

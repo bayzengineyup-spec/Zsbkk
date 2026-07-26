@@ -137,6 +137,49 @@
   #placebar button#pb-ok { background: var(--gold-dim); border-color: var(--gold); color: #1a1207; font-weight: bold; }
   #placebar button#pb-ok:disabled { opacity: 0.45; }
 
+  /* ---- diplomasi paneli ---- */
+  #diplopanel {
+    position: fixed; left: 8px; right: 8px; bottom: 74px; z-index: 19;
+    background: rgba(20,15,11,0.97); border: 1px solid var(--panel-edge);
+    border-radius: 12px; padding: 10px; display: none;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.6); max-height: 58vh; overflow-y: auto;
+  }
+  #diplopanel.show { display: block; }
+  #diplopanel h3 {
+    font-size: 11px; color: var(--gold); text-transform: uppercase;
+    letter-spacing: 0.5px; margin: 2px 4px 9px;
+  }
+  .dnote { font-size: 11px; color: var(--ink-dim); margin: 0 4px 8px; }
+  .dnote b { color: var(--gold); }
+  .dcard {
+    background: var(--panel); border: 1px solid var(--panel-edge);
+    border-radius: 9px; padding: 8px 10px; margin-bottom: 7px;
+  }
+  .dhead { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+  .dhead .dic { font-size: 15px; }
+  .dhead .dstat { margin-left: auto; font-size: 11px; font-weight: bold; }
+  .dsub { font-size: 10.5px; color: var(--ink-dim); margin: 3px 0 5px; }
+  .dbar { height: 4px; border-radius: 2px; background: rgba(0,0,0,0.4); overflow: hidden; margin-bottom: 7px; }
+  .dfill { height: 100%; border-radius: 2px; }
+  .dacts { display: flex; flex-wrap: wrap; gap: 5px; }
+  .dacts button {
+    font-family: inherit; font-size: 11px; padding: 6px 9px; border-radius: 7px;
+    border: 1px solid var(--panel-edge); background: #241a10; color: var(--ink);
+    cursor: pointer; min-height: 32px;
+  }
+  .dacts button.danger { border-color: #5a2c20; color: #e0a090; }
+
+  /* ---- etki çubuğu ---- */
+  #efxbar {
+    position: fixed; top: 50px; left: 8px; z-index: 15;
+    display: flex; flex-direction: column; gap: 4px; align-items: flex-start;
+  }
+  .efx {
+    background: rgba(26,20,16,0.9); border: 1px solid var(--panel-edge);
+    border-radius: 7px; padding: 3px 9px; font-size: 10.5px; color: var(--ink-dim);
+  }
+  .efx b { color: var(--ink); }
+
   /* ---- ipucu ---- */
   .hint {
     position: fixed; left: 50%; transform: translateX(-50%); bottom: 130px; z-index: 16;
@@ -214,6 +257,13 @@
   <div class="bgrid" id="bgrid"></div>
 </div>
 
+<div id="diplopanel">
+  <h3>Diplomasi</h3>
+  <div id="diplolist"></div>
+</div>
+
+<div id="efxbar"></div>
+
 <div id="placebar">
   <div class="pinfo"><b id="pb-name">—</b> · <span id="pb-status">yer seç</span></div>
   <button id="pb-ok" disabled>Kur</button>
@@ -226,21 +276,23 @@
 <div id="bottombar">
   <div class="btn on" id="b-explore"><span class="ic">🧭</span>Keşif</div>
   <div class="btn" id="b-build"><span class="ic">🏠</span>İnşa</div>
+  <div class="btn" id="b-diplo"><span class="ic">🤝</span>Diplomasi</div>
   <div class="btn" id="b-center"><span class="ic">🎯</span>Merkez</div>
   <div class="btn" id="b-new"><span class="ic">🌍</span>Yeni</div>
 </div>
 
 <div id="boot">
-  <span class="m1">Faz 0 · M2 — Köy Kurma</span>
+  <span class="m1">Faz 0 · M3 — Canlı Dünya</span>
   <h1>Krallıklar Çağı</h1>
-  <p>Köy meydanını kur, kaynak topla, halkını büyüt. Modüler motor: deterministik simülasyon + komut sistemi çalışıyor.</p>
+  <p>Sisin ardında rakip krallıklar büyüyor. Köyünü kur, felaketlere hazırlan, diplomasiyi kullan. Oyun otomatik kaydedilir — kaldığın yerden devam edersin.</p>
   <div class="ctl">
+    <button class="play" id="opt-continue" style="display:none">▶ Devam Et</button>
     <select id="opt-size">
       <option value="128">Küçük · 128</option>
       <option value="192" selected>Orta · 192</option>
       <option value="256">Büyük · 256</option>
     </select>
-    <button class="play" id="opt-play">Dünyayı Kur ▸</button>
+    <button class="play" id="opt-play">Yeni Dünya ▸</button>
   </div>
   <div id="loadmsg">Dünya üretiliyor…</div>
   <div class="seedrow">Tohum: <span id="opt-seed">rastgele</span></div>

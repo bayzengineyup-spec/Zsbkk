@@ -50,7 +50,70 @@ export interface Frame {
   ghost: Ghost | null;
   /** sim interpolasyon katsayısı 0..1 */
   alpha: number;
+  /** kozmetik animasyonlar için gerçek zaman (sn) — sim'e girmez */
+  t: number;
   stats: RenderStats;
+}
+
+/** Yanan bina alev efekti (kozmetik). */
+function drawFlames(f: Frame, sx: number, sy: number): void {
+  const { ctx } = f;
+  const z = f.cam.zoom;
+  const fl = Math.sin(f.t * 11 + sx * 0.13) * 0.5 + 0.5;
+  const fl2 = Math.sin(f.t * 14 + sy * 0.17 + 2) * 0.5 + 0.5;
+  const baseY = sy - 8 * z;
+  ctx.globalAlpha = 0.75 + fl * 0.25;
+  ctx.fillStyle = '#ff8a2c';
+  ctx.beginPath();
+  ctx.moveTo(sx - 5 * z, baseY);
+  ctx.lineTo(sx, baseY - (12 + fl * 6) * z);
+  ctx.lineTo(sx + 5 * z, baseY);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#ffd23c';
+  ctx.beginPath();
+  ctx.moveTo(sx - 2.5 * z, baseY);
+  ctx.lineTo(sx + 1 * z, baseY - (7 + fl2 * 4) * z);
+  ctx.lineTo(sx + 3.5 * z, baseY);
+  ctx.closePath();
+  ctx.fill();
+  // duman
+  ctx.globalAlpha = 0.22;
+  ctx.fillStyle = '#555';
+  ctx.beginPath();
+  ctx.arc(sx + fl2 * 3 * z, baseY - (18 + fl * 5) * z, (4 + fl * 2) * z, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+/** AI krallık başkenti işareti (yer tutucu — gerçek doku Faz 2'de). */
+function drawCapital(f: Frame, sx: number, sy: number, color: string): void {
+  const { ctx } = f;
+  const z = f.cam.zoom;
+  // kule gövdesi
+  ctx.fillStyle = '#4a4038';
+  ctx.fillRect(sx - 7 * z, sy - 16 * z, 14 * z, 14 * z);
+  ctx.fillStyle = '#5f544a';
+  ctx.fillRect(sx - 7 * z, sy - 16 * z, 14 * z, 4 * z);
+  // burç dişleri
+  ctx.fillStyle = '#4a4038';
+  for (let i = -1; i <= 1; i++) {
+    ctx.fillRect(sx + i * 5 * z - 1.5 * z, sy - 19 * z, 3 * z, 3.5 * z);
+  }
+  // krallık bayrağı
+  ctx.strokeStyle = '#2c241c';
+  ctx.lineWidth = 1.2 * z;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy - 19 * z);
+  ctx.lineTo(sx, sy - 28 * z);
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy - 28 * z);
+  ctx.lineTo(sx + 7 * z, sy - 26 * z);
+  ctx.lineTo(sx, sy - 24 * z);
+  ctx.closePath();
+  ctx.fill();
 }
 
 function drawVillager(f: Frame, v: Villager): void {
@@ -162,15 +225,31 @@ export function drawScene(f: Frame): void {
     for (let gx = gxStart; gx <= gxEnd; gx++) {
       const gy = s - gx;
       const i = world.idx(gx, gy);
+      // sis: hiç görülmemiş karo çizilmez (karanlık kalır)
+      const visLevel = sim ? sim.vis[i] : 2;
+      if (visLevel === 0) continue;
       const h = world.height[i];
       const spr = f.tileSprites.get(`${world.tiles[i]}:${shadeBucket(h)}`);
       if (!spr) continue;
       const c = cam.worldToScreen(gx, gy, h);
       if (c.x < -TILE_W * z || c.x > view.w + TILE_W * z) continue;
       if (c.y < -TILE_H * 3 * z || c.y > view.h + TILE_H * 3 * z) continue;
+      const dim = visLevel === 1;
+      if (dim) ctx.globalAlpha = 0.5; // keşfedilmiş ama görüş dışı: loş
       // 0.75px taşma: kesirli konumlarda sprite dikişlerini örter
       ctx.drawImage(spr.cnv, c.x - halfWz - 0.75, c.y - halfHz - 0.75, spr.w * z + 1.5, spr.h * z + 1.5);
       drawn++;
+
+      // krallık toprağı tonu
+      const owner = sim ? sim.kingdoms.ownerMap.get(i) : undefined;
+      if (owner) {
+        diamondPath(ctx, c.x, c.y, halfWz, halfHz);
+        ctx.fillStyle = owner.color;
+        const oldA = ctx.globalAlpha;
+        ctx.globalAlpha = oldA * 0.20;
+        ctx.fill();
+        ctx.globalAlpha = oldA;
+      }
 
       // kaynak işareti (yakınlaşınca, bina yoksa)
       const res = world.res[i];
@@ -184,16 +263,24 @@ export function drawScene(f: Frame): void {
         ctx.stroke();
       }
 
+      // AI başkenti
+      if (owner && owner.cx === gx && owner.cy === gy) {
+        drawCapital(f, c.x, c.y, owner.color);
+      }
+
       // bina
       const b = bMap.get(i);
       if (b) {
         const bspr = f.bSprites.get(b.type);
         if (bspr) drawBuildingSprite(f, bspr, gx, gy, h);
+        if (b.burning) drawFlames(f, c.x, c.y);
       }
 
-      // bu karodaki köylüler
-      const vs = vMap.get(i);
+      // bu karodaki köylüler (yalnız görüş alanında)
+      const vs = visLevel === 2 ? vMap.get(i) : undefined;
       if (vs) for (const v of vs) drawVillager(f, v);
+
+      if (dim) ctx.globalAlpha = 1;
     }
   }
   f.stats.tiles = drawn;
