@@ -169,6 +169,50 @@
   }
   .dacts button.danger { border-color: #5a2c20; color: #e0a090; }
 
+  /* ---- teknoloji paneli ---- */
+  #techpanel {
+    position: fixed; left: 8px; right: 8px; bottom: 74px; z-index: 19;
+    background: rgba(20,15,11,0.97); border: 1px solid var(--panel-edge);
+    border-radius: 12px; padding: 10px; display: none;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.6); max-height: 58vh; overflow-y: auto;
+  }
+  #techpanel.show { display: block; }
+  #techpanel h3 {
+    font-size: 11px; color: var(--gold); text-transform: uppercase;
+    letter-spacing: 0.5px; margin: 2px 4px 9px;
+  }
+  .techbr { font-size: 10.5px; color: var(--gold); margin: 8px 4px 5px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .techrow { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 6px; }
+  .tcard {
+    background: var(--panel); border: 1px solid var(--panel-edge);
+    border-radius: 9px; padding: 7px 8px; cursor: pointer; text-align: center;
+  }
+  .tcard .tic { font-size: 17px; }
+  .tcard .tnm { font-size: 10.5px; margin: 2px 0; }
+  .tcard .tcost { font-size: 9px; color: var(--ink-dim); }
+  .tcard.tdone { border-color: #3f6b3a; opacity: 0.8; }
+  .tcard.tdone .tcost { color: #9ccc7a; }
+  .tcard.tok { border-color: var(--gold-dim); }
+  .tcard.tpoor { opacity: 0.55; }
+  .tcard.tlock { opacity: 0.3; }
+
+  /* ---- son ekran ---- */
+  #endscreen {
+    position: fixed; inset: 0; z-index: 50; display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(8,5,3,0.92); gap: 14px; text-align: center; padding: 24px;
+  }
+  #endscreen.show { display: flex; }
+  #endscreen h1 { font-size: 38px; letter-spacing: 2px; text-shadow: 0 2px 10px #000; }
+  #end-msg { color: var(--ink); font-size: 14px; max-width: 340px; line-height: 1.5; }
+  #end-stats { color: var(--ink-dim); font-size: 12px; line-height: 1.8; }
+  #end-stats b { color: var(--ink); }
+  #end-again {
+    font-family: inherit; font-size: 14px; padding: 11px 22px; border-radius: 9px;
+    background: var(--gold-dim); border: 1px solid var(--gold); color: #1a1207;
+    font-weight: bold; cursor: pointer; margin-top: 6px;
+  }
+
   /* ---- etki çubuğu ---- */
   #efxbar {
     position: fixed; top: 50px; left: 8px; z-index: 15;
@@ -236,7 +280,9 @@
   <div class="stat" title="Odun">🪵 <b id="r-wood">0</b></div>
   <div class="stat" title="Taş">🪨 <b id="r-stone">0</b></div>
   <div class="stat" title="Altın">🪙 <b id="r-gold">0</b></div>
+  <div class="stat" title="Bilgi">📜 <b id="r-know">0</b></div>
   <div class="stat" title="Nüfus / Kapasite">👥 <b id="r-pop">0/0</b></div>
+  <div class="stat" title="Ordu">⚔️ <b id="r-army">0</b></div>
   <div class="stat" title="Mutluluk">😊 <b id="r-happy">—</b></div>
   <div class="stat" title="Mevsim"><b id="r-season">—</b></div>
   <div class="stat" title="FPS"><b id="hud-fps">—</b></div>
@@ -262,6 +308,18 @@
   <div id="diplolist"></div>
 </div>
 
+<div id="techpanel">
+  <h3>Teknoloji</h3>
+  <div id="techlist"></div>
+</div>
+
+<div id="endscreen">
+  <h1 id="end-title">ZAFER</h1>
+  <div id="end-msg"></div>
+  <div id="end-stats"></div>
+  <button id="end-again">Yeni Oyun</button>
+</div>
+
 <div id="efxbar"></div>
 
 <div id="placebar">
@@ -277,6 +335,7 @@
   <div class="btn on" id="b-explore"><span class="ic">🧭</span>Keşif</div>
   <div class="btn" id="b-build"><span class="ic">🏠</span>İnşa</div>
   <div class="btn" id="b-diplo"><span class="ic">🤝</span>Diplomasi</div>
+  <div class="btn" id="b-tech"><span class="ic">📜</span>Teknoloji</div>
   <div class="btn" id="b-center"><span class="ic">🎯</span>Merkez</div>
   <div class="btn" id="b-new"><span class="ic">🌍</span>Yeni</div>
 </div>

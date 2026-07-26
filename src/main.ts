@@ -14,10 +14,15 @@ import { drawScene, type Frame, type Ghost, type RenderStats, type TileSel } fro
 import { MiniMap } from './render/minimap';
 import { TouchInput } from './ui/input';
 import { initToasts, toast } from './ui/toast';
-import { saveNow, hasSave, restoreGame } from './ui/persist';
+import { saveNow, hasSave, restoreGame, clearSave } from './ui/persist';
 import {
   initDiplo, openDiploPanel, closeDiploPanel, refreshDiploPanel, diploOpen,
 } from './ui/diplo';
+import {
+  initTechPanel, openTechPanel, closeTechPanel, refreshTechPanel, techOpen,
+} from './ui/techpanel';
+import { UNITS, UNIT_KEYS, compTotal, compLabel } from './data/units';
+import { CMD_TRAITS } from './data/techs';
 
 function el<T extends HTMLElement>(id: string): T {
   const e = document.getElementById(id);
@@ -75,7 +80,9 @@ function refreshHUD(): void {
   el('r-wood').textContent = String(Math.floor(p.res.wood));
   el('r-stone').textContent = String(Math.floor(p.res.stone));
   el('r-gold').textContent = String(Math.floor(p.res.gold));
+  el('r-know').textContent = String(Math.floor(p.res.know));
   el('r-pop').textContent = `${p.pop}/${p.popCap}`;
+  el('r-army').textContent = String(compTotal(p.units));
   el('r-happy').textContent = `%${Math.round(p.happy)}`;
   const s = sim.currentSeason();
   el('r-season').textContent = `${s.icon} ${s.name} · ${sim.time.year}. yıl`;
@@ -84,6 +91,7 @@ function refreshHUD(): void {
     .map(e => `<div class="efx">${e.icon} <b>${e.name}</b> · ${Math.ceil(e.timer)}sn</div>`)
     .join('');
   refreshDiploPanel();
+  refreshTechPanel();
 }
 
 // ---------- karo bilgi kartı ----------
@@ -129,6 +137,31 @@ function refreshTileInfo(): void {
       plus.disabled = sim.player.idle <= 0 || b.workers >= def.maxWorkers;
       plus.onclick = () => { sim!.applyCommand({ kind: 'assign', x: gx, y: gy, delta: 1 }); refreshTileInfo(); refreshHUD(); };
       act.append(minus, plus);
+    }
+    if (b.type === 'barracks') {
+      // asker eğitimi + komutanlar
+      el('ti-l2').textContent = `Ordu: ${compLabel(sim.player.units)} · Boşta: ${sim.player.idle}`;
+      for (const u of UNIT_KEYS) {
+        const btn = document.createElement('button');
+        btn.textContent = `${UNITS[u].icon} ${costStr(UNITS[u].cost)}`;
+        btn.title = `${UNITS[u].name} — ${UNITS[u].desc}`;
+        btn.disabled = sim.player.idle <= 0 || !sim.canAfford(UNITS[u].cost);
+        btn.onclick = () => { sim!.applyCommand({ kind: 'train', unit: u }); refreshTileInfo(); refreshHUD(); };
+        act.append(btn);
+      }
+      const cmds = sim.military.commanders;
+      if (cmds.length < 5) {
+        const rc = document.createElement('button');
+        rc.textContent = `⭐ Komutan (🪙120 🍞80)`;
+        rc.disabled = !sim.canAfford({ gold: 120, food: 80 });
+        rc.onclick = () => { sim!.applyCommand({ kind: 'recruitCommander' }); refreshTileInfo(); refreshHUD(); };
+        act.append(rc);
+      }
+      if (cmds.length) {
+        el('ti-l3').textContent = cmds
+          .map(c => `${CMD_TRAITS[c.trait].icon}${c.name} sv${c.level}${c.captured ? '⛓' : c.busy ? '⚔️' : ''}`)
+          .join(' · ');
+      }
     }
     if (b.type === 'center') {
       const ups = BUILDINGS.center.upgrade!;
@@ -296,16 +329,30 @@ function closeDiplo(): void {
   bDiplo.classList.remove('on');
 }
 
-el('b-explore').onclick = () => { cancelPlace(); closeBuildPanel(); closeDiplo(); };
+const bTech = el<HTMLElement>('b-tech');
+
+function closeTech(): void {
+  closeTechPanel();
+  bTech.classList.remove('on');
+}
+
+el('b-explore').onclick = () => { cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); };
 bBuild.onclick = () => {
   if (buildpanel.classList.contains('show')) closeBuildPanel();
-  else { cancelPlace(); closeDiplo(); openBuildPanel(); }
+  else { cancelPlace(); closeDiplo(); closeTech(); openBuildPanel(); }
 };
 bDiplo.onclick = () => {
   if (diploOpen) closeDiplo();
   else {
-    cancelPlace(); closeBuildPanel();
+    cancelPlace(); closeBuildPanel(); closeTech();
     openDiploPanel(); bDiplo.classList.add('on');
+  }
+};
+bTech.onclick = () => {
+  if (techOpen) closeTech();
+  else {
+    cancelPlace(); closeBuildPanel(); closeDiplo();
+    openTechPanel(); bTech.classList.add('on');
   }
 };
 el('b-center').onclick = () => {
@@ -315,11 +362,11 @@ el('b-center').onclick = () => {
   haptic(10);
 };
 el('b-new').onclick = () => {
-  if (sim) saveNow(sim); // mevcut oyunu kaybetme
+  if (sim && !sim.gameOver) saveNow(sim); // mevcut oyunu kaybetme
   el('boot').style.display = 'flex';
   refreshBootButtons();
   world = null; sim = null; minimap = null;
-  cancelPlace(); closeBuildPanel(); closeDiplo(); hideInfo();
+  cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); hideInfo();
 };
 
 // diplomasi paneli bağlantısı
@@ -339,7 +386,56 @@ initDiplo({
     closeDiplo();
     haptic(10);
   },
+  onAttack: (kingdomId) => {
+    if (!sim) return;
+    sim.applyCommand({ kind: 'attack', kingdomId });
+    haptic(20);
+    refreshHUD();
+  },
 });
+
+// teknoloji paneli bağlantısı
+initTechPanel({
+  panel: el('techpanel'),
+  list: el('techlist'),
+  getSim: () => sim,
+  onResearch: (id) => {
+    if (!sim) return;
+    sim.applyCommand({ kind: 'research', techId: id });
+    haptic(15);
+    refreshHUD();
+  },
+});
+
+// ---------- son ekran ----------
+let endShown = false;
+
+function showEndScreen(): void {
+  if (!sim?.gameOver || endShown) return;
+  endShown = true;
+  const g = sim.gameOver;
+  el('end-title').textContent = g.won ? '🏆 ZAFER' : '💀 YENİLGİ';
+  el('end-title').style.color = g.won ? 'var(--gold)' : 'var(--danger)';
+  el('end-msg').textContent = g.msg;
+  el('end-stats').innerHTML =
+    `<div>Hayatta kalınan süre: <b>${g.stats.minutes} dk</b></div>`
+    + `<div>Ulaşılan yıl: <b>${g.stats.year}</b></div>`
+    + `<div>Nüfus: <b>${g.stats.pop}</b></div>`
+    + `<div>Bina: <b>${g.stats.buildings}</b></div>`
+    + `<div>İtibar: <b>${g.stats.reputation}</b></div>`
+    + `<div>Kalan rakip krallık: <b>${g.stats.kingdomsLeft}</b></div>`;
+  el('endscreen').classList.add('show');
+  clearSave(); // biten oyunun kaydı tutulmaz
+}
+
+el<HTMLButtonElement>('end-again').onclick = () => {
+  el('endscreen').classList.remove('show');
+  endShown = false;
+  world = null; sim = null; minimap = null;
+  cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); hideInfo();
+  el('boot').style.display = 'flex';
+  refreshBootButtons();
+};
 
 // ---------- dünya kurulumu ----------
 function finishSetup(focusX: number, focusY: number): void {
@@ -412,12 +508,12 @@ el<HTMLButtonElement>('opt-continue').onclick = continueGame;
 refreshBootButtons();
 
 // ---------- otomatik kayıt ----------
-// aralıklı + uygulama arka plana geçince (docs/10-KAYIT)
-setInterval(() => { if (sim) saveNow(sim); }, 20000);
+// aralıklı + uygulama arka plana geçince (docs/10-KAYIT); biten oyun kaydedilmez
+setInterval(() => { if (sim && !sim.gameOver) saveNow(sim); }, 20000);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden' && sim) saveNow(sim);
+  if (document.visibilityState === 'hidden' && sim && !sim.gameOver) saveNow(sim);
 });
-window.addEventListener('pagehide', () => { if (sim) saveNow(sim); });
+window.addEventListener('pagehide', () => { if (sim && !sim.gameOver) saveNow(sim); });
 
 // ---------- döngü ----------
 const SIM_HZ = 10, SIM_STEP = 1 / SIM_HZ;
@@ -458,6 +554,8 @@ function loop(t: number): void {
 
     hudAcc += dt;
     if (hudAcc >= 0.25) { hudAcc = 0; refreshHUD(); }
+
+    if (sim.gameOver) showEndScreen();
   }
 
   fpsFrames++; fpsAcc += dt;

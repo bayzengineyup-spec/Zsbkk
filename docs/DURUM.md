@@ -4,13 +4,38 @@
 > her oturum sonunda güncellenir. "Neredeydik, ne yaptık, sırada ne var?"
 
 ## 📍 Şu an
-- **Aşama:** **Faz 0 — M3 tamamlandı** (Canlı Dünya: olaylar, krallıklar,
-  diplomasi, sis, otomatik kayıt). Sırada M4: askeri sistem + teknoloji +
-  zafer/yenilgi → Faz 0 kapanışı.
-- **Sürüm:** v0.6-M3 (modüler) · referans: `prototype/kralliklar-cagi-v0.5.html`.
+- **Aşama:** **Faz 0 — M4 tamamlandı** (savaş, teknoloji, komutanlar, zafer).
+  Oyunun ÇEKİRDEK sistemleri modüler motorda tam çalışıyor. Sırada M5:
+  kalan prototip parite parçaları (aşağıda) → sonra **Faz 1: inşa süreleri**.
+- **Sürüm:** v0.6-M4 (modüler) · referans: `prototype/kralliklar-cagi-v0.5.html`.
 - **Son güncelleme:** 2026-07-26 (2. oturum).
 
 ## ✅ Tamamlanan
+### Faz 0 · M4 — Savaş & İlerleme (2. oturum, devam)
+- **Askeri sistem** (`core/military.ts` + `data/units.ts`): 3 birim türü
+  (taş-kağıt-makas + %65 karşıt bonusu), kışlada eğitim (kaynak+köylü),
+  ordu gönderme (komutanlı), yürüyen ordular, savaş çözümü (sur/kuşatma
+  cezası/şans/ganimet/toprak kaybı), sağ kalanların dönüşü, barbar akını,
+  AI'nin oyuncuya saldırısı (ilişki<-55 & güç üstünlüğü), müttefik yardımı,
+  sinsi ihanet saldırısı.
+- **Komutanlar:** 6 özellik, seviye/tecrübe (efsane teknolojisiyle 2x),
+  savaşta ölüm/esaret, orduya otomatik önderlik.
+- **Teknoloji** (`core/tech.ts` + `data/techs.ts`): 4 dalda 16 teknoloji,
+  önkoşul zinciri, tüm çarpanlar ekonomi/savaş/diplomasi/olaylara bağlı
+  (saban→tarla, taş ustalığı→maliyet, casus ağı→casusluk, pazar→ticaret…).
+- **Zafer/Yenilgi:** fetih, refah (meydan max + 50 nüfus), diplomatik
+  (herkesle ittifak), yenilgi (nüfus 0); istatistikli son ekran; oyun bitince
+  sim durur, kayıt temizlenir.
+- **Olay entegrasyonu:** barbar akını + kahraman olayları artık aktif;
+  felaket riski "sağlam yapı" ile azalıyor.
+- **Restore referans hatası bulundu ve düzeltildi** (host'ların tuttuğu
+  res/units referansları korunuyor) + buna regresyon testi.
+- **UI:** kışla paneli (eğitim+komutan), teknoloji paneli, diplomaside
+  "Saldır", HUD'da 📜 bilgi + ⚔️ ordu, son ekran; sahnede yürüyen ordu
+  (sancak+sayı rozeti).
+- **Testler: 66/66 yeşil** — savaş matematiği, eğitim, ordu yürüyüşü/savaşı,
+  komutanlar, teknoloji etkileri, zafer koşulları, askeri dahil kayıt
+  roundtrip determinizmi.
 ### Faz 0 · M3 — Canlı Dünya (2. oturum, devam)
 - **Olay/felaket sistemi** (`core/events.ts`): koşullu yangın (yayılır,
   söndürülür — komutla), veba (süreli can kaybı), deprem, kasırga, sert kış,
@@ -78,15 +103,17 @@
 - Master plan yazıldı: `docs/00`…`docs/12` + bu DURUM dosyası.
 - Prototip repoya alındı (`prototype/`).
 
-## 🔜 Sıradaki adım (Faz 0 · M4 — Faz 0 kapanışı)
-1. Askeri sistem: kışlada asker eğitimi, birim türleri (mızrakçı/okçu/süvari),
-   haritada yürüyen ordular, barbar akını + kahraman olayı, savunma/sur.
-2. Teknoloji ağacı (4 dal, 16 teknoloji) + akademi bilgi üretimiyle bağ.
-3. Komutanlar (yetenek + seviye).
-4. Zafer/yenilgi koşulları + son ekran.
-5. Ses motoru portu (sentez) — opsiyonel, M4 sonu.
-- Not: Görseller (karo + bina) bilinçli yer tutucu — **gerçek dokular Faz 2'de
-  her öğe için ayrı ayrı üretilecek** (kullanıcının açık talebi).
+## 🔜 Sıradaki adım (M5 — kalan prototip paritesi, sonra Faz 1)
+Çekirdek oynanış tamam. Prototipten henüz taşınmayan "atmosfer" parçaları:
+1. Ses motoru (Web Audio sentez — efekt + uyarlanabilir müzik).
+2. Gündüz/gece döngüsü + mevsim renk tonu (render).
+3. Yaban hayatı (hayvanlar + iskelet animasyonu) — Faz 2 ile birleşebilir.
+4. Öğretici (adım adım hedefler) + ayarlar paneli.
+5. Ticaret kervanları (görünür, yağmalanabilir) — market teknolojisiyle bağ.
+6. Kayıt slotları + dosya dışa/içe aktarma.
+Bunlar bitince **Faz 1: İnşa süreleri + üretim zincirleri** (docs/03) başlar.
+- Not: Görseller (karo + bina + köylü + ordu) bilinçli yer tutucu — **gerçek
+  dokular Faz 2'de her öğe için ayrı ayrı üretilecek** (kullanıcının açık talebi).
 - Not: WebGL atlas motoru henüz taşınmadı; Canvas2D sprite yolu 60 fps veriyor,
   sprite sayısı artınca geçilecek.
 - Not: Kayıt şimdilik tek slot (localStorage). Slotlar + IndexedDB + çevrimdışı
@@ -107,6 +134,10 @@
 - Ekonomi zinciri kaç adım derin olacak.
 
 ## 📝 Oturum notları
+- **2026-07-26 (2d):** Faz 0 M4 bitti — askeri sistem (birimler, ordular,
+  savaş, barbar/AI saldırıları), komutanlar, 16'lı teknoloji ağacı (tüm
+  çarpanlar bağlı), zafer/yenilgi + son ekran. Restore referans hatası
+  bulunup düzeltildi. 66 test yeşil; tarayıcıda eğitim→saldırı akışı doğrulandı.
 - **2026-07-26 (2c):** Faz 0 M3 bitti — olaylar/felaketler, AI krallıklar +
   tam diplomasi, sis, otomatik kayıt + Devam Et. 47 test yeşil; tarayıcıda
   yenile→devam doğrulandı. Kullanıcının "her açtığında hatırlasın" isteği

@@ -55,6 +55,13 @@ export interface KingdomHost {
   revealCircle(x: number, y: number, r: number): void;
   isTileVisible(i: number): boolean;
   toast(msg: string, kind?: '' | 'good' | 'bad'): void;
+  /** Krallık oyuncuya saldırı ordusu yollar (askeri sistem). */
+  attackPlayer(k: Kingdom): void;
+  /** Teknoloji çarpanları */
+  techDiplo(): number;
+  techTrade(): number;
+  spyCost(): number;
+  spyAlwaysSucceeds(): boolean;
 }
 
 export type DiploAction =
@@ -71,6 +78,8 @@ export function statusLabel(k: Kingdom): { t: string; c: string } {
 
 export class KingdomSystem {
   kingdoms: Kingdom[] = [];
+  /** Krallıklar hiç doğdu mu — fetih zaferi ancak o zaman geçerli. */
+  everSpawned = false;
   private nextKID = 1;
   private aiWarAcc = 0;
   /** karo → krallık (render + kervan/yağma için) */
@@ -123,6 +132,7 @@ export class KingdomSystem {
       const pk = persKeys[(rng() * persKeys.length) | 0];
       this.kingdoms.push(this.makeKingdom(s.x, s.y, pk));
     }
+    if (this.kingdoms.length > 0) this.everSpawned = true;
     this.rebuildOwnerMap();
   }
 
@@ -159,7 +169,7 @@ export class KingdomSystem {
     }
   }
 
-  private shrinkKingdom(k: Kingdom, n: number): void {
+  shrink(k: Kingdom, n: number): void {
     const w = this.host.world;
     const arr = [...k.tiles];
     arr.sort((a, b) => {
@@ -172,7 +182,7 @@ export class KingdomSystem {
     }
   }
 
-  private destroyKingdom(k: Kingdom): void {
+  destroy(k: Kingdom): void {
     this.kingdoms = this.kingdoms.filter(kk => kk.id !== k.id);
     for (const t of k.tiles) this.ownerMap.delete(t);
     this.host.toast(`👑 ${k.name} haritadan silindi!`, 'good');
@@ -214,6 +224,12 @@ export class KingdomSystem {
           host.toast(`⚔️ ${k.name} sınırında asker yığıyor!`, 'bad');
         }
       }
+      // saldırı kararı (prototip: maybeKingdomAttack)
+      if (host.playerHasCenter() && k.status !== 'truce' && k.status !== 'ally'
+        && k.relation < -55 && k.army > 5 && k.power > host.playerPower()
+        && rng() < pers.aggr * dt * 0.05) {
+        host.attackPlayer(k);
+      }
       // --- pasif diplomasi ---
       // ateşkes sayacı
       if (k.status === 'truce') {
@@ -223,9 +239,12 @@ export class KingdomSystem {
           host.toast(`🕊️ ${k.name} ile ateşkes sona erdi.`);
         }
       }
-      // ticaret geliri
+      // ticaret geliri (pazar ağı teknolojisi geliri artırır)
       if (k.tradeDeal && k.status !== 'war') {
-        host.playerRes.gold = Math.min(host.playerStorageCap(), host.playerRes.gold + 0.35 * dt);
+        host.playerRes.gold = Math.min(
+          host.playerStorageCap(),
+          host.playerRes.gold + 0.35 * dt * host.techTrade(),
+        );
         k.relation = Math.min(100, k.relation + dt * 0.4);
       }
       // müttefik hediyesi + sinsi ihaneti
@@ -241,8 +260,8 @@ export class KingdomSystem {
           k.betrayAcc += dt;
           if (k.betrayAcc > 12 && rng() < 0.02) {
             k.status = 'war'; k.relation = -100; k.plotting = false; k.tradeDeal = false;
-            host.toast(`🐍 İHANET! ${k.name} ittifakı bozup sana cephe aldı!`, 'bad');
-            // saldırı ordusu M4'te (askeri sistem) gelecek
+            host.toast(`🐍 İHANET! ${k.name} ittifakı bozup sana saldırıyor!`, 'bad');
+            host.attackPlayer(k);
           }
         }
       }
@@ -281,17 +300,17 @@ export class KingdomSystem {
     const seen = this.host.isTileVisible(a.cy * w.W + a.cx)
       || this.host.isTileVisible(b.cy * w.W + b.cx);
     if (aP > bP) {
-      this.shrinkKingdom(b, Math.max(1, Math.ceil(b.tiles.size * 0.18)));
+      this.shrink(b, Math.max(1, Math.ceil(b.tiles.size * 0.18)));
       b.army = Math.max(0, b.army * 0.5);
       a.army = Math.max(0, a.army * 0.8);
       a.pop += 4;
       if (seen) this.host.toast(`⚔️ ${a.name}, ${b.name} topraklarını ele geçirdi.`);
-      if (b.tiles.size <= 1) this.destroyKingdom(b);
+      if (b.tiles.size <= 1) this.destroy(b);
     } else {
-      this.shrinkKingdom(a, Math.max(1, Math.ceil(a.tiles.size * 0.12)));
+      this.shrink(a, Math.max(1, Math.ceil(a.tiles.size * 0.12)));
       a.army = Math.max(0, a.army * 0.5);
       if (seen) this.host.toast(`🛡️ ${b.name}, ${a.name} saldırısını püskürttü.`);
-      if (a.tiles.size <= 1) this.destroyKingdom(a);
+      if (a.tiles.size <= 1) this.destroy(a);
     }
   }
 
@@ -316,7 +335,7 @@ export class KingdomSystem {
         const cost = 50;
         if (host.playerRes.gold < cost) { host.toast(`Hediye için 🪙${cost} gerekli.`, 'bad'); return false; }
         host.playerRes.gold -= cost;
-        const gain = Math.round(14 * DIPLO_BASE[k.persKey].gift);
+        const gain = Math.round(14 * DIPLO_BASE[k.persKey].gift * host.techDiplo());
         k.relation = Math.min(100, k.relation + gain);
         k.trust = Math.min(100, k.trust + 6);
         host.changeReputation(2, '');
@@ -386,10 +405,10 @@ export class KingdomSystem {
         return false;
       }
       case 'spy': {
-        const cost = 40;
+        const cost = host.spyCost();
         if (host.playerRes.gold < cost) { host.toast(`Casus için 🪙${cost} gerekli.`, 'bad'); return false; }
         host.playerRes.gold -= cost;
-        if (rng() < 0.75) {
+        if (host.spyAlwaysSucceeds() || rng() < 0.75) {
           k.spied = true;
           host.revealCircle(k.cx, k.cy, 12);
           host.toast(`🕵️ Casus başarılı: ${k.name} hakkında bilgi topladın.`, 'good');
@@ -431,17 +450,19 @@ export class KingdomSystem {
     return {
       nextKID: this.nextKID,
       aiWarAcc: this.aiWarAcc,
+      everSpawned: this.everSpawned,
       kingdoms: this.kingdoms.map(k => ({ ...k, tiles: [...k.tiles] })),
     };
   }
 
   restore(data: unknown): void {
     const d = data as {
-      nextKID: number; aiWarAcc: number;
+      nextKID: number; aiWarAcc: number; everSpawned?: boolean;
       kingdoms: (Omit<Kingdom, 'tiles'> & { tiles: number[] })[];
     };
     this.nextKID = d.nextKID;
     this.aiWarAcc = d.aiWarAcc;
+    this.everSpawned = d.everSpawned ?? d.kingdoms.length > 0;
     this.kingdoms = d.kingdoms.map(k => ({ ...k, tiles: new Set(k.tiles) }));
     this.rebuildOwnerMap();
   }

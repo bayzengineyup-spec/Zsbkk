@@ -12,6 +12,8 @@ import type { World } from './world';
 import type { Command } from './commands';
 import { EventSystem, type EventHost } from './events';
 import { KingdomSystem, type KingdomHost } from './kingdoms';
+import { TechSystem, type TechHost } from './tech';
+import { MilitarySystem, type MilitaryHost } from './military';
 import {
   BUILDINGS, BASE_STORAGE,
   type BuildingType, type Cost, type ResKey,
@@ -19,6 +21,7 @@ import {
 import { SEASONS, SEASON_LEN, type SeasonDef } from '../data/seasons';
 import { ADLAR } from '../data/names';
 import { isWater } from '../data/biomes';
+import { compTotal, type UnitComp } from '../data/units';
 
 export interface Building {
   type: BuildingType;
@@ -52,6 +55,8 @@ export interface PlayerState {
   popCap: number;
   happy: number;
   reputation: number; // 0..100 — diplomaside herkesin sana bakışı
+  units: UnitComp;    // ordu bileşimi (köyde bekleyen)
+  defense: number;    // sur savunması
 }
 
 export interface TimeState { t: number; seasonIdx: number; year: number; }
@@ -63,7 +68,13 @@ export interface SimEvent {
 }
 
 /** Kayıt formatı sürümü — migrasyon için (docs/10-KAYIT). */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
+
+export interface GameOver {
+  won: boolean;
+  msg: string;
+  stats: { minutes: number; year: number; pop: number; buildings: number; reputation: number; kingdomsLeft: number };
+}
 
 export class Sim {
   readonly world: World;
@@ -72,6 +83,9 @@ export class Sim {
   time: TimeState = { t: 0, seasonIdx: 0, year: 1 };
   readonly events: EventSystem;
   readonly kingdoms: KingdomSystem;
+  readonly tech: TechSystem;
+  readonly military: MilitarySystem;
+  gameOver: GameOver | null = null;
 
   /** Sis: 0 = hiç görülmedi, 1 = keşfedildi, 2 = şu an görüşte */
   vis: Uint8Array;
@@ -99,8 +113,18 @@ export class Sim {
       popCap: 0,
       happy: 70,
       reputation: 50,
+      units: { spear: 0, archer: 0, cav: 0 },
+      defense: 0,
     };
     this.vis = new Uint8Array(world.W * world.H);
+
+    const techHost: TechHost = {
+      res: this.player.res,
+      hasAcademy: () => this.player.buildings.some(b => b.type === 'academy'),
+      recalcCaps: () => this.recalcCaps(),
+      toast: (msg, kind) => this.toast(msg, kind ?? ''),
+    };
+    this.tech = new TechSystem(techHost);
 
     // ---- alt sistem bağlantıları (host arayüzleri) ----
     const eventHost: EventHost = {
@@ -122,6 +146,10 @@ export class Sim {
       season: () => this.currentSeason(),
       year: () => this.time.year,
       toast: (msg, kind) => this.toast(msg, kind ?? ''),
+      spawnBarbarians: () => this.military.barbarianRaid(),
+      hasBarracks: () => this.hasBarracks(),
+      addSoldiers: (n) => { this.player.units.spear += n; },
+      disasterMult: () => this.tech.disaster(),
     };
     this.events = new EventSystem(eventHost);
 
@@ -138,8 +166,47 @@ export class Sim {
       revealCircle: (x, y, r) => this.revealCircle(x, y, r),
       isTileVisible: (i) => this.vis[i] > 0,
       toast: (msg, kind) => this.toast(msg, kind ?? ''),
+      attackPlayer: (k) => this.military.kingdomAttacksPlayer(k),
+      techDiplo: () => this.tech.diplo(),
+      techTrade: () => this.tech.trade(),
+      spyCost: () => this.tech.spyCost(),
+      spyAlwaysSucceeds: () => this.tech.spyAlways(),
     };
     this.kingdoms = new KingdomSystem(kingdomHost);
+
+    const militaryHost: MilitaryHost = {
+      rng: this.rng,
+      world: this.world,
+      kingdoms: this.kingdoms, // yukarıda oluşturuldu
+      tech: this.tech,
+      units: () => this.player.units,
+      res: this.player.res,
+      storageCap: () => this.player.storageCap,
+      idle: () => this.player.idle,
+      takeIdle: () => {
+        if (this.player.idle <= 0) return false;
+        this.player.idle--;
+        return true;
+      },
+      pop: () => this.player.pop,
+      losePop: (n) => this.addPop(-n),
+      addHappy: (d) => { this.player.happy = Math.max(0, Math.min(100, this.player.happy + d)); },
+      defense: () => this.player.defense,
+      buildingCount: () => this.player.buildings.length,
+      hasBarracks: () => this.hasBarracks(),
+      hasCenter: () => this.player.hasCenter,
+      villageCenter: () => this.villageCenter(),
+      canAfford: (c) => this.canAfford(c),
+      pay: (c) => this.pay(c),
+      changeReputation: (d, r) => this.changeReputation(d, r),
+      year: () => this.time.year,
+      toast: (msg, kind) => this.toast(msg, kind ?? ''),
+    };
+    this.military = new MilitarySystem(militaryHost);
+  }
+
+  hasBarracks(): boolean {
+    return this.player.buildings.some(b => b.type === 'barracks');
   }
 
   // ---------- olay kuyruğu ----------
@@ -237,6 +304,13 @@ export class Sim {
         return b ? this.events.extinguish(b) : false;
       }
       case 'diplo': return this.kingdoms.applyAction(cmd.kingdomId, cmd.action);
+      case 'train': return this.military.train(cmd.unit);
+      case 'attack': {
+        const k = this.kingdoms.byId(cmd.kingdomId);
+        return k ? this.military.sendArmy(k) : false;
+      }
+      case 'research': return this.tech.research(cmd.techId);
+      case 'recruitCommander': return this.military.recruitCommander();
     }
   }
 
@@ -246,17 +320,25 @@ export class Sim {
       this.toast(`Zaten bir ${def.name} var.`, 'bad'); return false;
     }
     if (!this.canPlaceOn(type, x, y)) { this.toast('Buraya kurulamaz.', 'bad'); return false; }
-    if (!this.canAfford(def.cost)) { this.toast('Yeterli kaynak yok.', 'bad'); return false; }
-    this.pay(def.cost);
+    const cost = this.tech.scaledCost(def.cost); // taş ustalığı indirimi
+    if (!this.canAfford(cost)) { this.toast('Yeterli kaynak yok.', 'bad'); return false; }
+    this.pay(cost);
     this.player.buildings.push({ type, x, y, level: 1, workers: 0 });
     if (type === 'center') {
       this.player.hasCenter = true;
       this.syncVillagers();
     }
     this.recalcCaps();
+    this.recalcDefense();
     this.updateFog();
     this.toast(`${def.name} kuruldu.`, 'good');
     return true;
+  }
+
+  recalcDefense(): void {
+    this.player.defense = this.player.buildings
+      .filter(b => b.type === 'wall')
+      .reduce((s) => s + (BUILDINGS.wall.defense ?? 0), 0);
   }
 
   private assignWorker(x: number, y: number, delta: 1 | -1): boolean {
@@ -306,6 +388,7 @@ export class Sim {
       this.player.hasCenter = this.player.buildings.some(x => x.type === 'center');
     }
     this.recalcCaps();
+    this.recalcDefense();
     this.assignJobsToVillagers();
   }
 
@@ -314,14 +397,15 @@ export class Sim {
     for (const b of this.player.buildings) {
       const def = BUILDINGS[b.type];
       if (def.popCap) {
-        popCap += (b.type === 'center' && b.level > 1)
+        popCap += ((b.type === 'center' && b.level > 1)
           ? BUILDINGS.center.upgrade![b.level - 2].popCap
-          : def.popCap;
+          : def.popCap)
+          + (b.type === 'house' ? this.tech.housing() : 0); // kat mimarisi
       }
       if (def.storage) storage += def.storage;
     }
     this.player.popCap = popCap;
-    this.player.storageCap = storage;
+    this.player.storageCap = Math.round(storage * this.tech.storage()); // büyük ambarlar
   }
 
   // ---------- nüfus yardımcıları (olay sistemi de kullanır) ----------
@@ -493,6 +577,10 @@ export class Sim {
       this.revealCircle(b.x, b.y, r);
     }
     for (const v of this.villagers) this.revealCircle(v.x | 0, v.y | 0, 4);
+    // ordular (sadece bizimkiler keşfeder)
+    for (const a of this.military.armies) {
+      if (a.owner === 'player') this.revealCircle(a.x | 0, a.y | 0, 7);
+    }
   }
 
   // ---------- zaman & mevsim ----------
@@ -525,7 +613,8 @@ export class Sim {
       if (!def.prod || b.workers <= 0) continue;
       if (b.burning) continue; // yanan bina üretmez
       for (const k of Object.keys(def.prod) as ResKey[]) {
-        let gain = (def.prod[k] ?? 0) * b.workers * b.level * moodMult * evMult * dt;
+        let gain = (def.prod[k] ?? 0) * b.workers * b.level * moodMult * evMult * dt
+          * this.tech.prodMult(k, b.type);
         if (k === 'food') gain *= season.farm;
         p.res[k] = Math.min(p.storageCap, p.res[k] + gain);
       }
@@ -569,24 +658,66 @@ export class Sim {
     if (p.popCap > p.pop) target += 8;
     if (p.popCap <= p.pop) target -= 10;
     if (p.res.gold > 50) target += 5;
+    target += this.tech.happy(); // tapınak ayinleri
     target = Math.max(0, Math.min(100, target));
     p.happy += (target - p.happy) * Math.min(1, dt * 0.5);
   }
 
   // ---------- ana tick ----------
   tick(dt: number): void {
+    if (this.gameOver) return; // oyun bitti — sim durur
     for (const v of this.villagers) { v.px = v.x; v.py = v.y; }
     this.updateTime(dt);
     this.events.tick(dt);
     this.economyTick(dt);
     this.updateVillagers(dt);
     this.kingdoms.tick(dt);
+    this.military.tick(dt);
     // sis: her tick değil, ~saniyede 2 kez (performans)
     this.fogAcc += dt;
     if (this.fogAcc >= 0.5) {
       this.fogAcc = 0;
       if (this.player.hasCenter) this.updateFog();
     }
+    this.checkGameEnd();
+  }
+
+  // ---------- zafer & yenilgi (prototipten) ----------
+  private checkGameEnd(): void {
+    if (this.gameOver || !this.player.hasCenter) return;
+    const ks = this.kingdoms.kingdoms;
+
+    if (this.player.pop <= 0) {
+      this.endGame(false, 'Halkın tükendi. Krallığın tarihe karıştı.');
+      return;
+    }
+    if (this.kingdoms.everSpawned && ks.length === 0) {
+      this.endGame(true, 'Haritada başka krallık kalmadı. Tek hükümdar sensin!');
+      return;
+    }
+    const c = this.player.buildings.find(b => b.type === 'center');
+    const maxLvl = 1 + BUILDINGS.center.upgrade!.length;
+    if (c && c.level >= maxLvl && this.player.pop >= 50) {
+      this.endGame(true, 'İmparatorluk Tahtı yükseldi ve halkın refah içinde. Efsanevi bir çağ!');
+      return;
+    }
+    if (ks.length >= 2 && ks.every(k => k.status === 'ally')) {
+      this.endGame(true, 'Ayakta kalan tüm krallıklarla ittifak kurdun. Barışın mimarı sensin!');
+    }
+  }
+
+  private endGame(won: boolean, msg: string): void {
+    this.gameOver = {
+      won, msg,
+      stats: {
+        minutes: Math.floor(this.time.t / 60),
+        year: this.time.year,
+        pop: this.player.pop,
+        buildings: this.player.buildings.length,
+        reputation: Math.round(this.player.reputation),
+        kingdomsLeft: this.kingdoms.kingdoms.length,
+      },
+    };
   }
 
   // ---------- kayıt / yükleme ----------
@@ -604,6 +735,9 @@ export class Sim {
       time: this.time,
       events: this.events.serialize(),
       kingdoms: this.kingdoms.serialize(),
+      tech: this.tech.serialize(),
+      military: this.military.serialize(),
+      gameOver: this.gameOver,
       vis: Array.from(this.vis),
       lastVisible: this.lastVisible,
     };
@@ -614,7 +748,8 @@ export class Sim {
     const d = data as ReturnType<Sim['serialize']> & {
       rngState: number; nextVID: number; starveAcc: number; popGrowAcc: number;
       fogAcc: number; player: PlayerState; villagers: Villager[]; time: TimeState;
-      events: unknown; kingdoms: unknown; vis: number[]; lastVisible: number[];
+      events: unknown; kingdoms: unknown; tech: unknown; military: unknown;
+      gameOver: GameOver | null; vis: number[]; lastVisible: number[];
     };
     const sim = new Sim(world);
     sim.rng.setState(d.rngState);
@@ -622,13 +757,24 @@ export class Sim {
     sim.starveAcc = d.starveAcc;
     sim.popGrowAcc = d.popGrowAcc;
     sim.fogAcc = d.fogAcc;
-    // player nesnesi kingdoms host'una referansla bağlı — içeriği kopyala
-    Object.assign(sim.player, d.player);
-    Object.assign(sim.player.res, (d.player as PlayerState).res);
+    // DİKKAT: sistem host'ları `player.res` ve `player.units` REFERANSLARINI
+    // kuruluşta yakalar. Bu nesneler asla değiştirilmemeli — yalnız içerik
+    // kopyalanır; yoksa restore sonrası host'lar bayat nesneye yazar.
+    const saved = d.player as PlayerState;
+    const resRef = sim.player.res;
+    const unitsRef = sim.player.units;
+    Object.assign(sim.player, saved);
+    sim.player.res = resRef;
+    sim.player.units = unitsRef;
+    Object.assign(resRef, saved.res);
+    Object.assign(unitsRef, saved.units);
     sim.villagers = d.villagers;
     sim.time = d.time;
     sim.events.restore(d.events);
     sim.kingdoms.restore(d.kingdoms);
+    sim.tech.restore(d.tech);
+    sim.military.restore(d.military);
+    sim.gameOver = d.gameOver;
     sim.vis.set(d.vis);
     sim.lastVisible = d.lastVisible;
     sim.fogDirty = true;
@@ -659,6 +805,16 @@ export class Sim {
         relation: Math.round(k.relation * 1e6) / 1e6,
         status: k.status,
       })),
+      units: this.player.units,
+      defense: this.player.defense,
+      armies: this.military.armies.map(a => ({
+        id: a.id, owner: a.owner, size: a.size,
+        x: Math.round(a.x * 1e6) / 1e6, y: Math.round(a.y * 1e6) / 1e6,
+        returning: a.returning,
+      })),
+      commanders: this.military.commanders,
+      techs: Object.keys(this.tech.done).sort(),
+      gameOver: this.gameOver,
       visSum: this.vis.reduce((a, b) => a + b, 0),
     };
   }

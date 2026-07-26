@@ -6,6 +6,8 @@
    ============================================================ */
 import type { BuildingType } from '../data/buildings';
 import type { DiploAction } from './kingdoms';
+import type { UnitKey } from '../data/units';
+import type { TechId } from '../data/techs';
 
 export type Command =
   | { kind: 'place'; building: BuildingType; x: number; y: number }
@@ -13,4 +15,8 @@ export type Command =
   | { kind: 'upgradeCenter'; x: number; y: number }
   | { kind: 'demolish'; x: number; y: number }
   | { kind: 'extinguish'; x: number; y: number }
-  | { kind: 'diplo'; kingdomId: number; action: DiploAction };
+  | { kind: 'diplo'; kingdomId: number; action: DiploAction }
+  | { kind: 'train'; unit: UnitKey }
+  | { kind: 'attack'; kingdomId: number }
+  | { kind: 'research'; techId: TechId }
+  | { kind: 'recruitCommander' };

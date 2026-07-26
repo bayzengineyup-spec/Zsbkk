@@ -36,6 +36,14 @@ export interface EventHost {
   season(): SeasonDef;
   year(): number;
   toast(msg: string, kind?: '' | 'good' | 'bad'): void;
+  /** Barbar akını başlat (askeri sistem) — başarı durumu döner. */
+  spawnBarbarians(): boolean;
+  /** Kışla var mı (kahraman olayı şartı) */
+  hasBarracks(): boolean;
+  /** Orduya asker kat (kahraman olayı — mızrakçı olarak) */
+  addSoldiers(n: number): void;
+  /** Felaket risk çarpanı (sağlam yapı teknolojisi ile 0.5) */
+  disasterMult(): number;
 }
 
 export class EventSystem {
@@ -174,6 +182,15 @@ export class EventSystem {
     return true;
   }
 
+  eventHero(): boolean {
+    if (!this.host.hasBarracks()) return false;
+    const n = 4 + ((this.host.rng() * 4) | 0);
+    this.host.addSoldiers(n);
+    this.host.toast(`⭐ KAHRAMAN! ${n} savaşçı davana katıldı.`, 'good');
+    this.host.addHappy(8);
+    return true;
+  }
+
   // ---------- olay seçici ----------
   tryRandomEvent(): void {
     if (!this.host.hasCenter()) return;
@@ -182,17 +199,19 @@ export class EventSystem {
     const push = (w: number, fn: () => boolean) => { if (w > 0) pool.push({ w, fn }); };
 
     // felaketler — koşullu ağırlık
-    push(this.woodenRatio() * s.fire * 2.2, () => this.eventFire());
+    push(this.woodenRatio() * s.fire * 2.2 * this.host.disasterMult(), () => this.eventFire());
     push(this.crowding() * 1.6 * (this.hasEffect('plague') ? 0 : 1), () => this.eventPlague());
-    push(0.5, () => this.eventEarthquake());
+    push(0.5 * this.host.disasterMult(), () => this.eventEarthquake());
     push(this.woodenRatio() * 1.0, () => this.eventStorm());
     push(s.key === 'kis' && !this.hasEffect('harsh') ? 2.2 : 0, () => this.eventHarshWinter());
+    push(this.host.year() >= 1 ? 1.4 : 0, () => this.host.spawnBarbarians());
     push(this.host.happy() < 25 ? 3.0 : 0, () => this.eventRebellion());
 
     // iyi olaylar
     push(this.host.happy() > 60 ? 1.6 : 0.5, () => this.eventGoldenAge());
     push(this.host.popCap() > this.host.pop() ? 1.5 : 0, () => this.eventMigration());
     push(1.2, () => this.eventCaravan());
+    push(this.host.hasBarracks() ? 1.0 : 0, () => this.eventHero());
 
     const total = pool.reduce((a, p) => a + p.w, 0);
     if (total <= 0) return;

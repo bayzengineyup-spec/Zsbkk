@@ -86,6 +86,65 @@ function drawFlames(f: Frame, sx: number, sy: number): void {
   ctx.globalAlpha = 1;
 }
 
+/** Yürüyen ordu (yer tutucu): asker kümesi + sancak + sayı rozeti. */
+function drawArmy(f: Frame, sx: number, sy: number, color: string, size: number): void {
+  const { ctx } = f;
+  const z = f.cam.zoom;
+  const step = Math.sin(f.t * 9) * 0.8 * z; // yürüyüş sallanması
+  // gölge
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + 1.5 * z, 8 * z, 3 * z, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // asker kümesi (3 figür)
+  const offs: [number, number][] = [[-5, 0], [0, -2], [5, 0]];
+  for (let i = 0; i < offs.length; i++) {
+    const ox = offs[i][0] * z, oy = offs[i][1] * z + (i === 1 ? -step : step);
+    ctx.fillStyle = '#3a3430';
+    ctx.beginPath();
+    ctx.ellipse(sx + ox, sy - 4 * z + oy, 2.2 * z, 3.4 * z, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#e8c8a0';
+    ctx.beginPath();
+    ctx.arc(sx + ox, sy - 8.5 * z + oy, 1.8 * z, 0, Math.PI * 2);
+    ctx.fill();
+    // mızrak
+    ctx.strokeStyle = '#8a7a5a';
+    ctx.lineWidth = 0.9 * z;
+    ctx.beginPath();
+    ctx.moveTo(sx + ox + 2 * z, sy - 2 * z + oy);
+    ctx.lineTo(sx + ox + 2 * z, sy - 13 * z + oy);
+    ctx.stroke();
+  }
+  // sancak
+  ctx.strokeStyle = '#2c241c';
+  ctx.lineWidth = 1.2 * z;
+  ctx.beginPath();
+  ctx.moveTo(sx - 7 * z, sy - 3 * z);
+  ctx.lineTo(sx - 7 * z, sy - 18 * z);
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(sx - 7 * z, sy - 18 * z);
+  ctx.lineTo(sx - 1 * z, sy - 16 * z);
+  ctx.lineTo(sx - 7 * z, sy - 14 * z);
+  ctx.closePath();
+  ctx.fill();
+  // sayı rozeti
+  const label = String(size);
+  ctx.font = `bold ${Math.max(9, 8 * z)}px sans-serif`;
+  const tw = ctx.measureText(label).width;
+  ctx.fillStyle = 'rgba(12,8,5,0.82)';
+  const bw = tw + 8 * z * 0.6;
+  ctx.beginPath();
+  ctx.roundRect(sx - bw / 2, sy - 26 * z, bw, 10 * z, 3 * z);
+  ctx.fill();
+  ctx.fillStyle = '#f0e6d2';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, sx, sy - 21 * z);
+}
+
 /** AI krallık başkenti işareti (yer tutucu — gerçek doku Faz 2'de). */
 function drawCapital(f: Frame, sx: number, sy: number, color: string): void {
   const { ctx } = f;
@@ -284,6 +343,20 @@ export function drawScene(f: Frame): void {
     }
   }
   f.stats.tiles = drawn;
+
+  // ---- yürüyen ordular ----
+  if (sim) {
+    for (const a of sim.military.armies) {
+      const ix = a.x | 0, iy = a.y | 0;
+      if (!world.inBounds(ix, iy)) continue;
+      if (sim.vis[world.idx(ix, iy)] === 0 && a.owner !== 'player') continue;
+      const rx = a.px + (a.x - a.px) * f.alpha;
+      const ry = a.py + (a.y - a.py) * f.alpha;
+      const h = world.height[world.idx(ix, iy)];
+      const c = cam.worldToScreen(rx - 0.5, ry - 0.5, h);
+      drawArmy(f, c.x, c.y, a.color, a.size);
+    }
+  }
 
   // ---- hayalet (inşa modu) ----
   if (f.ghost && world.inBounds(f.ghost.gx, f.ghost.gy)) {
