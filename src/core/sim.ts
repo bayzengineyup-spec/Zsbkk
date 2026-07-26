@@ -90,7 +90,7 @@ export interface SimEvent {
 }
 
 /** Kayıt formatı sürümü — migrasyon için (docs/10-KAYIT). */
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export interface GameOver {
   won: boolean;
@@ -128,7 +128,10 @@ export class Sim {
     this.world = world;
     this.rng = makeRNG((world.seed ^ 0x5f3a9c1) >>> 0);
     this.player = {
-      res: { food: 120, wood: 150, stone: 60, gold: 30, know: 0 },
+      res: {
+        food: 120, wood: 150, stone: 60, gold: 30, know: 0,
+        plank: 0, flour: 0, bread: 0,
+      },
       pop: 5,
       idle: 5,
       hasCenter: false,
@@ -759,15 +762,37 @@ export class Sim {
       if (!def.prod || b.workers <= 0) continue;
       if (b.burning) continue;   // yanan bina üretmez
       if (!isActive(b)) continue; // inşa halindeki bina üretmez
+      const workMult = b.workers * b.level * moodMult * evMult * dt;
+      // --- zincir girdisi: yetersizse üretim aynı oranda kısılır ---
+      let factor = 1;
+      if (def.input) {
+        for (const k of Object.keys(def.input) as ResKey[]) {
+          const need = (def.input[k] ?? 0) * workMult;
+          if (need > 0) factor = Math.min(factor, p.res[k] / need);
+        }
+        factor = Math.max(0, Math.min(1, factor));
+        if (factor > 0) {
+          for (const k of Object.keys(def.input) as ResKey[]) {
+            p.res[k] = Math.max(0, p.res[k] - (def.input[k] ?? 0) * workMult * factor);
+          }
+        }
+      }
       for (const k of Object.keys(def.prod) as ResKey[]) {
-        let gain = (def.prod[k] ?? 0) * b.workers * b.level * moodMult * evMult * dt
-          * this.tech.prodMult(k, b.type);
+        let gain = (def.prod[k] ?? 0) * workMult * factor * this.tech.prodMult(k, b.type);
         if (k === 'food') gain *= season.farm;
+        const before = p.res[k];
         p.res[k] = Math.min(p.storageCap, p.res[k] + gain);
+        // depo dolu uyarısı (üretim boşa gidiyor)
+        if (gain > 0 && before + gain > p.storageCap) this.warnStorageFull(k);
       }
     }
 
-    p.res.food -= p.pop * 0.06 * dt * season.food * this.events.effectMult('foodMult');
+    // --- tüketim: önce ekmek (1 ekmek = 2 yiyecek değerinde) ---
+    let need = p.pop * 0.06 * dt * season.food * this.events.effectMult('foodMult');
+    const breadUse = Math.min(p.res.bread, need / 2);
+    p.res.bread -= breadUse;
+    need -= breadUse * 2;
+    p.res.food -= need;
 
     this.updateHappiness(dt);
 
@@ -805,9 +830,24 @@ export class Sim {
     if (p.popCap > p.pop) target += 8;
     if (p.popCap <= p.pop) target -= 10;
     if (p.res.gold > 50) target += 5;
+    if (p.res.bread > 1) target += 6; // taze ekmek — halk memnun
     target += this.tech.happy(); // tapınak ayinleri
     target = Math.max(0, Math.min(100, target));
     p.happy += (target - p.happy) * Math.min(1, dt * 0.5);
+  }
+
+  /** Depo dolu uyarısı — kaynak başına en çok 30 sn'de bir (yalnız bildirim,
+      sim durumunu etkilemez → determinizme dahil değildir). */
+  private capWarnAt: Partial<Record<ResKey, number>> = {};
+  private warnStorageFull(k: ResKey): void {
+    const last = this.capWarnAt[k] ?? -999;
+    if (this.time.t - last < 30) return;
+    this.capWarnAt[k] = this.time.t;
+    const NAMES: Record<ResKey, string> = {
+      food: 'Yiyecek', wood: 'Odun', stone: 'Taş', gold: 'Altın', know: 'Bilgi',
+      plank: 'Kereste', flour: 'Un', bread: 'Ekmek',
+    };
+    this.toast(`⚠️ Depo dolu — ${NAMES[k]} boşa gidiyor! Ambar kur/yükselt.`, 'bad');
   }
 
   // ---------- ana tick ----------

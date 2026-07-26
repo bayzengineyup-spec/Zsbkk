@@ -4,15 +4,31 @@
 > her oturum sonunda güncellenir. "Neredeydik, ne yaptık, sırada ne var?"
 
 ## 📍 Şu an
-- **Aşama:** **FAZ 1 · M1 tamamlandı — İNŞA SÜRELERİ ÇALIŞIYOR** (kullanıcının
-  özel isteği ✔). Sırada Faz 1 · M2: üretim zincirleri (un→ekmek, kereste).
-- **Sürüm:** v0.7-M1 · referans: `prototype/kralliklar-cagi-v0.5.html`.
+- **Aşama:** 🎉 **FAZ 1 TAMAMLANDI** (M1 inşa süreleri + M2 üretim zincirleri).
+  Sırada kullanıcı tercihiyle: **Faz 2 (gerçek dokular — her öğe ayrı)** veya
+  **Faz 3 (kayıt genişletme: slotlar, IndexedDB, çevrimdışı ilerleme)**.
+- **Sürüm:** v0.7 (Faz 1 final) · referans: `prototype/kralliklar-cagi-v0.5.html`.
 - **Son güncelleme:** 2026-07-26 (2. oturum).
 - **Bilinçli ertelenenler:** WebGL atlas (Canvas2D 60 fps veriyor; sprite
   sayısı artınca), iskelet animasyonları + gerçek dokular (Faz 2), kayıt
   slotları/IndexedDB/çevrimdışı ilerleme (Faz 3).
 
 ## ✅ Tamamlanan
+### FAZ 1 · M2 — Üretim Zincirleri (2. oturum, devam)
+- **Yeni kaynaklar:** 🪚 kereste (plank), 🌫 un (flour), 🥖 ekmek (bread).
+- **Zincirler:** odun → Bıçkıhane → kereste · yiyecek(tahıl) → Değirmen → un
+  → Fırın → ekmek. Girdi tüketen üretim: girdi yetersizse üretim aynı
+  oranda kısılır; fırın unu anında tüketip dengede çalışır (testli).
+- **Zincir sırası zorunlu:** Değirmen/Fırın maliyeti kereste ister →
+  önce Bıçkıhane kurulmalı.
+- **Ekmek premium gıda:** tüketimde ÖNCE ekmek yenir (1 ekmek = 2 yiyecek)
+  ve halka +6 mutluluk verir → zincire yatırım gerçek fayda sağlar.
+- **Depo dolu uyarısı:** üretim boşa gidiyorsa kaynak başına 30 sn'de bir
+  bildirim ("Ambar kur/yükselt").
+- **UI:** HUD'da kereste+ekmek, bilgi kartında zincir akışı (girdi→çıktı/sn).
+- **Testler: 88/88** — girdi tüketimi, kıtlıkta durma/devam, zincir sırası,
+  tam zincir ekmek üretimi, ekmek önceliği+mutluluk, depo uyarısı, zincir
+  ortasında kayıt roundtrip determinizmi.
 ### FAZ 1 · M1 — İnşa Süreleri (2. oturum, devam)
 - **"Bir yer kurunca süre olmalı" ✔** Kur → kaynak düşer → ŞANTİYE:
   bina zeminden yükselir (clip), iskele direkleri, ilerleme çubuğu, kalan
@@ -147,16 +163,14 @@
 - Master plan yazıldı: `docs/00`…`docs/12` + bu DURUM dosyası.
 - Prototip repoya alındı (`prototype/`).
 
-## 🔜 Sıradaki adım — FAZ 1 · M2: Üretim Zincirleri (docs/03)
-1. Yeni kaynaklar: tahıl → un → ekmek; kütük → kereste (girdi tüketen binalar).
-2. Yeni binalar: Değirmen, Fırın, Bıçkıhane (girdi/çıktı akışı).
-3. Kaynağa özel depo uyarıları ("ambar dolu, üretim boşa gidiyor").
-4. Denge testi: zincirin bir halkası durunca alt üretim yavaşlamalı.
-Sonra Faz 2 (gerçek dokular — her öğe için ayrı) veya Faz 3 (kayıt
-genişletme, çevrimdışı ilerleme).
-- Not: Görseller (karo + bina + köylü + ordu + hayvan) bilinçli yer tutucu —
-  **gerçek dokular Faz 2'de her öğe için ayrı ayrı üretilecek** (kullanıcının
-  açık talebi).
+## 🔜 Sıradaki adım — kullanıcı tercihi
+FAZ 1 bitti. İki güçlü aday (docs/11-YOL-HARITASI):
+- **FAZ 2 — Grafik & Sanat:** gerçek dokular HER ÖĞE İÇİN AYRI AYRI
+  (kullanıcının açık talebi), boyut/oran standardı, iskelet animasyonları,
+  doku denetimi. Oyunun "çizgi film" görünümü burada çözülür.
+- **FAZ 3 — Kayıt & Devamlılık genişletmesi:** kayıt slotları, IndexedDB,
+  çevrimdışı ilerleme ("sen yokken +320 odun"), migrasyon altyapısı.
+Varsayılan öneri: FAZ 2 (görsel etki en yüksek).
 
 ## 🧠 Karar günlüğü (neden böyle?)
 - **HTML prototipi temel alındı** çünkü gerçek WebGL grafik motoru ve canlı

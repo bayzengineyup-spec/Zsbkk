@@ -23,13 +23,15 @@ Amaç: prototipi modüler, test edilebilir projeye taşımak.
   bilinçli ertelendi: gerçek dokular her öğe için ayrı üretilecek; WebGL
   atlas gerektiğinde). 71 test, determinizm + kayıt roundtrip kanıtlı.
 
-## FAZ 1 — İnşa süreleri & ekonomi derinliği `[0.7]`
-- [ ] İnşa/yükseltme SÜRE sistemi (kuyruk, işçi, ilerleme, iptal) — bkz. 03.
-- [ ] Aşamalı inşa görseli (iskele→tam).
-- [ ] Tüm binalara seviye/yükseltme.
-- [ ] İlk üretim zincirleri (un→ekmek, kereste, cevher→alet).
-- [ ] Kaynağa özel depo + uyarılar.
-- **Bitti kriteri:** bina kurunca süre işliyor, ekonomi zincirli.
+## FAZ 1 — İnşa süreleri & ekonomi derinliği `[0.7]` ✅
+- [x] İnşa/yükseltme SÜRE sistemi (kuyruk sınırı, işçi hızlandırma, ilerleme, %70 iade).
+- [x] Aşamalı inşa görseli (yükselen bina + iskele + ilerleme çubuğu).
+- [x] Tüm binalara seviye/yükseltme (süreli; yükseltme sırasında bina çalışır).
+- [x] Süreli asker eğitim kuyruğu (birim başına süre; kışla sv2 hızlandırır).
+- [x] İlk üretim zincirleri: odun→kereste, tahıl→un→ekmek (girdi tüketen üretim;
+      ekmek 2x besler + mutluluk). *(cevher→alet ileride, çağ sistemiyle)*
+- [x] Depo dolu uyarıları. *(kaynağa özel silolar Faz 8'e ertelendi)*
+- **✅ TAMAMLANDI** — 88 test; şantiye/kuyruk/zincir ortasında kayıt determinizmi kanıtlı.
 
 ## FAZ 2 — Grafik & sanat yükseltmesi `[0.8]`
 - [ ] Doku denetimi + "saçma" dokuları yeniden üret (katmanlı prosedürel).

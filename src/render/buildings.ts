@@ -44,6 +44,9 @@ const STYLES: Record<BuildingType, Style> = {
   academy:    { fw: 46, wall: 24, roof: 12, wallC: '#d8d2c2', roofC: '#3f6b8a' },
   barracks:   { fw: 48, wall: 16, roof: 6,  wallC: '#7d5a4a', roofC: '#5a3a30' },
   wall:       { fw: 56, wall: 14, roof: 0,  wallC: '#9a9184', roofC: '#b5ada0' },
+  lumbermill: { fw: 46, wall: 13, roof: 8,  wallC: '#96702c', roofC: '#4a5a2c' },
+  mill:       { fw: 42, wall: 20, roof: 14, wallC: '#cabb96', roofC: '#8a5030', banner: true },
+  bakery:     { fw: 40, wall: 13, roof: 9,  wallC: '#c89a6a', roofC: '#83402a' },
 };
 
 function shade(hex: string, mult: number): string {

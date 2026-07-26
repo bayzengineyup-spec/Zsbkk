@@ -6,9 +6,17 @@
 
 export type BuildingType =
   | 'center' | 'house' | 'woodcutter' | 'quarry' | 'farm'
-  | 'hunter' | 'mine' | 'storehouse' | 'academy' | 'barracks' | 'wall';
+  | 'hunter' | 'mine' | 'storehouse' | 'academy' | 'barracks' | 'wall'
+  | 'lumbermill' | 'mill' | 'bakery';
 
-export type ResKey = 'food' | 'wood' | 'stone' | 'gold' | 'know';
+/**
+ * Kaynaklar. Zincir kaynakları (Faz 1 M2):
+ * wood → plank (Bıçkıhane) · food(tahıl) → flour (Değirmen) → bread (Fırın)
+ * Ekmek premium gıdadır: 1 ekmek = 2 yiyecek değerinde tüketilir + mutluluk.
+ */
+export type ResKey =
+  | 'food' | 'wood' | 'stone' | 'gold' | 'know'
+  | 'plank' | 'flour' | 'bread';
 export type Cost = Partial<Record<ResKey, number>>;
 export type PlaceRule = 'land' | 'near_wood' | 'near_stone' | 'fertile' | 'near_gold';
 
@@ -28,6 +36,9 @@ export interface BuildingDef {
   maxLevel: number;
   popCap?: number;
   prod?: Partial<Record<ResKey, number>>;
+  /** işçi başına saniyede tüketilen girdi (zincir binaları) —
+      girdi yetmezse üretim aynı oranda kısılır */
+  input?: Partial<Record<ResKey, number>>;
   storage?: number;
   defense?: number;
   unique?: boolean;
@@ -122,12 +133,35 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     desc: 'Köyünün savunmasını artırır, baskınları zorlaştırır.', on: 'land',
     buildTime: 6, maxLevel: 1,
   },
+  // ---- üretim zinciri binaları (Faz 1 M2) ----
+  lumbermill: {
+    name: 'Bıçkıhane', icon: '🪚', cat: 'üretim',
+    cost: { wood: 60, stone: 20 }, maxWorkers: 2,
+    input: { wood: 0.5 }, prod: { plank: 0.25 },
+    desc: 'Odunu keresteye çevirir. Kereste, gelişmiş binaların şartıdır.',
+    on: 'land', buildTime: 14, maxLevel: 3,
+  },
+  mill: {
+    name: 'Değirmen', icon: '⚙️', cat: 'üretim',
+    cost: { wood: 40, plank: 10 }, maxWorkers: 2,
+    input: { food: 0.4 }, prod: { flour: 0.3 },
+    desc: 'Tahılı una öğütür. Fırının girdisi.',
+    on: 'land', buildTime: 12, maxLevel: 3,
+  },
+  bakery: {
+    name: 'Fırın', icon: '🥖', cat: 'üretim',
+    cost: { wood: 30, stone: 30, plank: 10 }, maxWorkers: 2,
+    input: { flour: 0.3 }, prod: { bread: 0.25 },
+    desc: 'Undan ekmek pişirir. Ekmek 2 kat besler ve halkı mutlu eder.',
+    on: 'land', buildTime: 12, maxLevel: 3,
+  },
 };
 
 /** Maliyeti "🪵30 🪨40" biçiminde yaz. */
 export function costStr(cost: Cost): string {
   const ICONS: Record<ResKey, string> = {
     food: '🍞', wood: '🪵', stone: '🪨', gold: '🪙', know: '📜',
+    plank: '🪚', flour: '🌫', bread: '🥖',
   };
   const parts: string[] = [];
   for (const k of Object.keys(cost) as ResKey[]) {

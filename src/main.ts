@@ -86,6 +86,8 @@ function refreshHUD(): void {
   el('r-wood').textContent = String(Math.floor(p.res.wood));
   el('r-stone').textContent = String(Math.floor(p.res.stone));
   el('r-gold').textContent = String(Math.floor(p.res.gold));
+  el('r-plank').textContent = String(Math.floor(p.res.plank));
+  el('r-bread').textContent = String(Math.floor(p.res.bread));
   el('r-know').textContent = String(Math.floor(p.res.know));
   el('r-pop').textContent = `${p.pop}/${p.popCap}`;
   el('r-army').textContent = String(compTotal(p.units));
@@ -139,7 +141,9 @@ function refreshTileInfo(): void {
       ? ` · ⬆ %${Math.round((1 - b.buildLeft / (b.buildTotal ?? 1)) * 100)}`
       : '';
     el('ti-name').textContent = `${def.icon} ${def.name} · sv ${b.level}${upgradingTxt}${b.burning ? ' 🔥' : ''}`;
-    el('ti-l1').textContent = def.desc;
+    el('ti-l1').textContent = def.input
+      ? `Zincir: ${costStr(def.input)}/sn → ${costStr(def.prod ?? {})}/sn (işçi başına)`
+      : def.desc;
     el('ti-l2').textContent = def.maxWorkers
       ? `İşçi: ${b.workers}/${def.maxWorkers} · Boşta: ${sim.player.idle}`
       : '';
