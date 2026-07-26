@@ -10,7 +10,7 @@ import type { World } from '../core/world';
 import type { Sim, Building, Villager } from '../core/sim';
 import type { Creature } from '../core/wildlife';
 import type { BuildingType } from '../data/buildings';
-import type { ResourceKind } from '../data/biomes';
+import { BIOMES, type ResourceKind } from '../data/biomes';
 import { SPECIES } from '../data/species';
 import { Camera, TILE_W, TILE_H, type Viewport } from './camera';
 import { shadeBucket, DETAIL_VARIANTS, type TileSprite, type TreeSprite } from './tiles';
@@ -50,6 +50,11 @@ function tileHash(i: number): number {
 }
 
 export interface RenderStats { tiles: number; sprites: number; }
+
+/* biyom kenarı yumuşatma yönleri: [dx, dy, kenar anahtarı] */
+const EDGE_DIRS: Array<[number, number, string]> = [
+  [0, -1, 'eNE'], [1, 0, 'eSE'], [0, 1, 'eSW'], [-1, 0, 'eNW'],
+];
 
 export interface Frame {
   ctx: CanvasRenderingContext2D;
@@ -530,6 +535,20 @@ export function drawScene(f: Frame): void {
       if (dim) ctx.globalAlpha = 0.5; // keşfedilmiş ama görüş dışı: loş
       // 0.75px taşma: kesirli konumlarda sprite dikişlerini örter
       ctx.drawImage(spr.cnv, c.x - halfWz - 0.75, c.y - halfHz - 0.75, spr.w * z + 1.5, spr.h * z + 1.5);
+      // biyom sınırı yumuşatma: farklı komşunun rengi kenardan içeri taşar
+      if (!BIOMES[biome].water) {
+        for (const [dx, dy, ek] of EDGE_DIRS) {
+          const nx = gx + dx, ny = gy + dy;
+          if (!world.inBounds(nx, ny)) continue;
+          const nb = world.tiles[world.idx(nx, ny)];
+          if (nb === biome || BIOMES[nb].water) continue;
+          const eSpr = f.tileSprites.get(`${nb}:${ek}`);
+          if (eSpr) {
+            ctx.drawImage(eSpr.cnv, c.x - halfWz - 0.75, c.y - halfHz - 0.75, eSpr.w * z + 1.5, eSpr.h * z + 1.5);
+          }
+        }
+      }
+
       // detay katmanı: karo konumundan deterministik varyant (tekrar kırıcı).
       // Çok uzak zoom'da atlanır — zaten seçilemez, çizim maliyeti düşer.
       if (z >= 0.75) {

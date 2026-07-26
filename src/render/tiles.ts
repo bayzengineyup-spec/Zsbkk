@@ -289,6 +289,54 @@ export function buildTileSprites(): Map<string, TileSprite> {
 
       out.set(`${id}:d${v}`, { cnv, w: TILE_W, h: TILE_H });
     }
+
+    /* ---- kenar geçiş katmanları (biyom sınırı yumuşatma) ----
+       Bu biyomun rengi, komşu karonun ortak kenarından içeri doğru
+       yumuşakça taşar → biyom sınırlarındaki keskin elmas kenarları
+       doğal renk geçişine dönüşür (kullanıcı geri bildirimi). */
+    if (!def.water) {
+      const halfW = w / 2, halfH = topH / 2;
+      const hyp = Math.hypot(halfW, halfH);
+      const depth = ((halfW * halfH) / hyp) * 0.9; // kenardan merkeze mesafe
+      const hexN = parseInt(def.top.slice(1), 16);
+      const tr = (hexN >> 16) & 255, tg = (hexN >> 8) & 255, tb = hexN & 255;
+      const rgba = (a: number) => `rgba(${tr},${tg},${tb},${a})`;
+      const EDGES: Array<{ key: string; c1: [number, number]; c2: [number, number]; inw: [number, number] }> = [
+        { key: 'eNE', c1: [halfW, 0], c2: [w, halfH], inw: [-halfH, halfW] },
+        { key: 'eSE', c1: [w, halfH], c2: [halfW, topH], inw: [-halfH, -halfW] },
+        { key: 'eSW', c1: [halfW, topH], c2: [0, halfH], inw: [halfH, -halfW] },
+        { key: 'eNW', c1: [0, halfH], c2: [halfW, 0], inw: [halfH, halfW] },
+      ];
+      for (const e of EDGES) {
+        const { rng: erng, R: eR } = painter(3000 + bi * 17 + e.key.charCodeAt(1));
+        const cnv = document.createElement('canvas');
+        cnv.width = w; cnv.height = topH;
+        const c = cnv.getContext('2d')!;
+        c.beginPath();
+        c.moveTo(halfW, 0); c.lineTo(w, halfH); c.lineTo(halfW, topH); c.lineTo(0, halfH);
+        c.closePath(); c.clip();
+        const ex = (e.c1[0] + e.c2[0]) / 2, ey = (e.c1[1] + e.c2[1]) / 2;
+        const il = Math.hypot(e.inw[0], e.inw[1]);
+        const ix = e.inw[0] / il, iy = e.inw[1] / il;
+        const g = c.createLinearGradient(ex, ey, ex + ix * depth, ey + iy * depth);
+        g.addColorStop(0, rgba(0.5));
+        g.addColorStop(0.45, rgba(0.2));
+        g.addColorStop(1, rgba(0));
+        c.fillStyle = g;
+        c.fillRect(0, 0, w, topH);
+        // organik karışım benekleri (düz degrade çizgisi kalmasın)
+        for (let i = 0; i < 14; i++) {
+          const t = erng();
+          const px = e.c1[0] + (e.c2[0] - e.c1[0]) * t + ix * eR(0.04, 0.55) * depth;
+          const py = e.c1[1] + (e.c2[1] - e.c1[1]) * t + iy * eR(0.04, 0.55) * depth;
+          c.fillStyle = rgba(eR(0.1, 0.3));
+          c.beginPath();
+          c.ellipse(px, py, eR(1.5, 4) * S, eR(1, 2.5) * S, eR(0, 3), 0, 7);
+          c.fill();
+        }
+        out.set(`${id}:${e.key}`, { cnv, w: TILE_W, h: TILE_H });
+      }
+    }
   }
   return out;
 }
