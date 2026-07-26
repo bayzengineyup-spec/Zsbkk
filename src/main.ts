@@ -32,7 +32,8 @@ import {
 import {
   initTechPanel, openTechPanel, closeTechPanel, refreshTechPanel, techOpen,
 } from './ui/techpanel';
-import { UNITS, UNIT_KEYS, compTotal, compLabel } from './data/units';
+import { UNITS, UNIT_KEYS, compTotal, compLabel, type UnitComp, type UnitKey } from './data/units';
+import { TACTICS, type Tactic } from './core/military';
 import { CMD_TRAITS } from './data/techs';
 import { applyTheme } from './ui/theme';
 
@@ -89,6 +90,7 @@ Object.defineProperty(window, '__game', {
 let minimap: MiniMap | null = null;
 let sel: TileSel | null = null;
 let ghost: Ghost | null = null;
+let armySel: number | null = null; // haritada seçili oyuncu ordusu (Faz 4)
 const stats: RenderStats = { tiles: 0, sprites: 0 };
 
 initToasts(el('toasts'));
@@ -130,7 +132,41 @@ const tileinfo = el<HTMLElement>('tileinfo');
 
 function hideInfo(): void {
   sel = null;
+  armySel = null;
   tileinfo.classList.remove('show');
+}
+
+/** Seçili ordunun bilgi kartı (hareket ettikçe periyodik tazelenir). */
+function refreshArmyInfo(): void {
+  if (!sim || armySel === null) return;
+  const a = sim.military.armies.find(x => x.id === armySel && x.owner === 'player');
+  if (!a) { hideInfo(); return; } // ordu vardı, savaş/dönüş bitti
+  const act = el<HTMLElement>('ti-act');
+  const T = TACTICS[a.tactic ?? 'dengeli'];
+  const targetName = a.returning
+    ? 'köye dönüyor'
+    : (typeof a.targetK === 'number'
+        ? (sim.kingdoms.byId(a.targetK)?.name ?? '—')
+        : '—');
+  const eta = Math.ceil(Math.hypot(a.tx - a.x, a.ty - a.y) / 3.5);
+  el('ti-name').textContent = `⚔️ Ordun · ${a.size} asker`;
+  el('ti-l1').textContent = `Birlik: ${compLabel(a.comp)}`;
+  el('ti-l2').textContent = `Hedef: ${targetName} · ~${eta}sn`;
+  const cmd = a.cmdId !== null ? sim.military.commanders.find(c => c.id === a.cmdId) : null;
+  el('ti-l3').textContent = `${T.icon} ${T.name}${cmd ? ` · ⭐${cmd.name} sv${cmd.level}` : ''}`;
+  act.innerHTML = '';
+  act.style.display = 'flex';
+  if (!a.returning) {
+    const rc = document.createElement('button');
+    rc.textContent = '↩ Geri Çağır';
+    rc.onclick = () => {
+      sim!.applyCommand({ kind: 'recallArmy', armyId: a.id });
+      haptic(15);
+      refreshArmyInfo();
+    };
+    act.append(rc);
+  }
+  tileinfo.classList.add('show');
 }
 
 function refreshTileInfo(): void {
@@ -354,6 +390,87 @@ el<HTMLButtonElement>('pb-cancel').onclick = () => {
   }
 };
 
+// ---------- ordu gönderme paneli (Faz 4) ----------
+const armypanel = el<HTMLElement>('armypanel');
+let apKingdom: number | null = null;
+const apComp: UnitComp = { spear: 0, archer: 0, cav: 0 };
+let apTactic: Tactic = 'dengeli';
+
+function closeArmyPanel(): void {
+  armypanel.classList.remove('show');
+  apKingdom = null;
+}
+
+function renderArmyPanel(): void {
+  if (!sim || apKingdom === null) return;
+  const k = sim.kingdoms.byId(apKingdom);
+  if (!k) { closeArmyPanel(); return; }
+  el('ap-title').textContent = `⚔️ ${k.name} · Ordu Gönder`;
+  const rows = el<HTMLElement>('ap-rows');
+  rows.innerHTML = '';
+  const units = sim.player.units;
+  for (const u of UNIT_KEYS) {
+    const have = units[u];
+    const row = document.createElement('div');
+    row.className = 'aprow';
+    const nm = document.createElement('div');
+    nm.className = 'apnm';
+    nm.innerHTML = `${UNITS[u].icon} ${UNITS[u].name} <small>(eldeki: ${have})</small>`;
+    const minus = document.createElement('button');
+    minus.textContent = '−';
+    minus.disabled = apComp[u] <= 0;
+    minus.onclick = () => { apComp[u] = Math.max(0, apComp[u] - 1); renderArmyPanel(); };
+    const val = document.createElement('div');
+    val.className = 'apval';
+    val.textContent = String(apComp[u]);
+    const plus = document.createElement('button');
+    plus.textContent = '+';
+    plus.disabled = apComp[u] >= have;
+    plus.onclick = () => { apComp[u] = Math.min(have, apComp[u] + 1); renderArmyPanel(); };
+    const all = document.createElement('button');
+    all.textContent = apComp[u] >= have ? '0' : 'hepsi';
+    all.onclick = () => { apComp[u] = apComp[u] >= have ? 0 : have; renderArmyPanel(); };
+    row.append(nm, minus, val, plus, all);
+    rows.appendChild(row);
+  }
+  const tacts = el<HTMLElement>('ap-tactics');
+  tacts.innerHTML = '';
+  for (const t of Object.keys(TACTICS) as Tactic[]) {
+    const b = document.createElement('button');
+    b.className = apTactic === t ? 'on' : '';
+    b.textContent = `${TACTICS[t].icon} ${TACTICS[t].name}`;
+    b.onclick = () => { apTactic = t; renderArmyPanel(); };
+    tacts.appendChild(b);
+  }
+  el('ap-desc').textContent = TACTICS[apTactic].desc;
+  const total = compTotal(apComp);
+  const go = el<HTMLButtonElement>('ap-go');
+  go.textContent = total > 0 ? `⚔️ Saldır (${total})` : '⚔️ Saldır';
+  go.disabled = total <= 0;
+}
+
+function openArmyPanel(kingdomId: number): void {
+  if (!sim) return;
+  cancelPlace(); closeBuildPanel(); hideInfo();
+  apKingdom = kingdomId;
+  // varsayılan: tüm ordu seçili
+  apComp.spear = sim.player.units.spear;
+  apComp.archer = sim.player.units.archer;
+  apComp.cav = sim.player.units.cav;
+  renderArmyPanel();
+  armypanel.classList.add('show');
+}
+
+el<HTMLButtonElement>('ap-cancel').onclick = closeArmyPanel;
+el<HTMLButtonElement>('ap-go').onclick = () => {
+  if (!sim || apKingdom === null) return;
+  const ok = sim.applyCommand({
+    kind: 'attack', kingdomId: apKingdom,
+    comp: { ...apComp }, tactic: apTactic,
+  });
+  if (ok) { haptic(25); closeArmyPanel(); refreshHUD(); }
+};
+
 // ---------- ses ----------
 loadSoundPrefs();
 window.addEventListener('pointerdown', () => sndResume(), { once: true });
@@ -399,6 +516,18 @@ const input = new TouchInput(cv, cam, view, () => world, {
       ghost.gx = g.gx; ghost.gy = g.gy;
       updateGhostValidity();
     } else {
+      // önce ordu vuruşu: dokunulan karodaki oyuncu ordusu seçilir (Faz 4)
+      const hitArmy = sim?.military.armies.find(a =>
+        a.owner === 'player'
+        && Math.abs(a.x - 0.5 - g.gx) < 0.9
+        && Math.abs(a.y - 0.5 - g.gy) < 0.9);
+      if (hitArmy) {
+        sel = null;
+        armySel = hitArmy.id;
+        refreshArmyInfo();
+        return;
+      }
+      armySel = null;
       sel = { gx: g.gx, gy: g.gy };
       refreshTileInfo();
     }
@@ -434,7 +563,7 @@ function closeTech(): void {
   bTech.classList.remove('on');
 }
 
-el('b-explore').onclick = () => { cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); };
+el('b-explore').onclick = () => { cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); closeArmyPanel(); };
 bBuild.onclick = () => {
   if (buildpanel.classList.contains('show')) closeBuildPanel();
   else { cancelPlace(); closeDiplo(); closeTech(); openBuildPanel(); }
@@ -477,7 +606,7 @@ function refreshMenu(): void {
 bMenu.onclick = () => {
   if (menupanel.classList.contains('show')) closeMenu();
   else {
-    cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech();
+    cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); closeArmyPanel();
     refreshMenu();
     menupanel.classList.add('show');
     bMenu.classList.add('on');
@@ -526,7 +655,7 @@ el('m-new').onclick = () => {
   el('boot').style.display = 'flex';
   renderSlots();
   world = null; sim = null; minimap = null;
-  cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); hideInfo();
+  cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); closeArmyPanel(); hideInfo();
 };
 
 // diplomasi paneli bağlantısı
@@ -548,9 +677,9 @@ initDiplo({
   },
   onAttack: (kingdomId) => {
     if (!sim) return;
-    sim.applyCommand({ kind: 'attack', kingdomId });
-    haptic(20);
-    refreshHUD();
+    closeDiplo();
+    openArmyPanel(kingdomId); // birim seçici + taktik (Faz 4)
+    haptic(15);
   },
 });
 
@@ -592,7 +721,7 @@ el<HTMLButtonElement>('end-again').onclick = () => {
   el('endscreen').classList.remove('show');
   endShown = false;
   world = null; sim = null; minimap = null;
-  cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); hideInfo();
+  cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); closeArmyPanel(); hideInfo();
   el('boot').style.display = 'flex';
   renderSlots();
 };
@@ -788,14 +917,19 @@ function loop(t: number): void {
       bSprites: night ? bSpritesNight : bSpritesDay,
       treeSprites,
       capSprite: night ? capNight : capDay,
-      tintMap, resIcons, terrain,
+      tintMap, resIcons, terrain, armySel,
       sim, sel, ghost, alpha, t: renderT, stats,
     };
     drawScene(frame);
     minimap.draw(mmx, cam, view, sim, dt);
 
     hudAcc += dt;
-    if (hudAcc >= 0.25) { hudAcc = 0; refreshHUD(); updateTutorial(sim); }
+    if (hudAcc >= 0.25) {
+      hudAcc = 0;
+      refreshHUD();
+      updateTutorial(sim);
+      if (armySel !== null) refreshArmyInfo(); // ordu kartı canlı kalsın
+    }
 
     if (sim.gameOver) showEndScreen();
   }

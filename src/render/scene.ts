@@ -76,6 +76,8 @@ export interface Frame {
   tintMap: Float32Array | null;
   resIcons: Map<ResourceKind, TileSprite>;
   terrain: TerrainCache;
+  /** haritada seçili oyuncu ordusu (vurgu halkası) */
+  armySel: number | null;
   sim: Sim | null;
   sel: TileSel | null;
   ghost: Ghost | null;
@@ -1112,6 +1114,16 @@ export function drawScene(f: Frame): void {
       const ry = a.py + (a.y - a.py) * f.alpha;
       const h = world.height[world.idx(ix, iy)];
       const c = cam.worldToScreen(rx - 0.5, ry - 0.5, h);
+      // seçili ordu: altın vurgu halkası
+      if (f.armySel === a.id) {
+        ctx.strokeStyle = '#d9a441';
+        ctx.lineWidth = 2 * z;
+        ctx.setLineDash([4 * z, 3 * z]);
+        ctx.beginPath();
+        ctx.ellipse(c.x, c.y + 0.5 * z, 11 * z, 4.5 * z, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
       drawArmy(f, c.x, c.y, a.color, a.size);
     }
     // ---- ticaret kervanları ----

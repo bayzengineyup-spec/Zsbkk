@@ -6,7 +6,8 @@
    ============================================================ */
 import type { BuildingType } from '../data/buildings';
 import type { DiploAction } from './kingdoms';
-import type { UnitKey } from '../data/units';
+import type { UnitComp, UnitKey } from '../data/units';
+import type { Tactic } from './military';
 import type { TechId } from '../data/techs';
 
 export type Command =
@@ -17,6 +18,8 @@ export type Command =
   | { kind: 'extinguish'; x: number; y: number }
   | { kind: 'diplo'; kingdomId: number; action: DiploAction }
   | { kind: 'train'; unit: UnitKey }
-  | { kind: 'attack'; kingdomId: number }
+  /** comp verilmezse tüm ordu; tactic verilmezse dengeli (Faz 4) */
+  | { kind: 'attack'; kingdomId: number; comp?: UnitComp; tactic?: Tactic }
+  | { kind: 'recallArmy'; armyId: number }
   | { kind: 'research'; techId: TechId }
   | { kind: 'recruitCommander' };

@@ -357,8 +357,9 @@ export class Sim {
       case 'train': return this.military.train(cmd.unit);
       case 'attack': {
         const k = this.kingdoms.byId(cmd.kingdomId);
-        return k ? this.military.sendArmy(k) : false;
+        return k ? this.military.sendArmy(k, cmd.comp, cmd.tactic ?? 'dengeli') : false;
       }
+      case 'recallArmy': return this.military.recall(cmd.armyId);
       case 'research': return this.tech.research(cmd.techId);
       case 'recruitCommander': return this.military.recruitCommander();
     }

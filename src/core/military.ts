@@ -15,6 +15,32 @@ import {
 import { CMD_TRAITS, CMD_NAMES, type CmdTraitKey } from '../data/techs';
 import type { Cost } from '../data/buildings';
 
+/* ---- taktik duruşlar (Faz 4): saldırıda risk/ödül dengesi ---- */
+export type Tactic = 'agresif' | 'dengeli' | 'temkinli';
+export interface TacticDef {
+  name: string; icon: string; desc: string;
+  /** saldırı gücü çarpanı */ atk: number;
+  /** kayıp çarpanı */ loss: number;
+  /** bozgunda ordu dağılmaz, yarı kayıpla çekilir */ retreat: boolean;
+}
+export const TACTICS: Record<Tactic, TacticDef> = {
+  agresif: {
+    name: 'Agresif', icon: '🔥',
+    desc: 'Saldırı +%22 · kayıplar +%25',
+    atk: 1.22, loss: 1.25, retreat: false,
+  },
+  dengeli: {
+    name: 'Dengeli', icon: '⚖️',
+    desc: 'Standart taarruz',
+    atk: 1, loss: 1, retreat: false,
+  },
+  temkinli: {
+    name: 'Temkinli', icon: '🛡️',
+    desc: 'Saldırı -%15 · kayıplar -%30 · bozgunda çekilir',
+    atk: 0.85, loss: 0.7, retreat: true,
+  },
+};
+
 export interface Army {
   id: number;
   owner: 'player' | 'barbar' | number; // number = krallık id
@@ -27,6 +53,8 @@ export interface Army {
   returning: boolean;
   color: string;
   cmdId: number | null;
+  /** oyuncu ordusunun taktik duruşu (eski kayıtlarda yok → dengeli) */
+  tactic?: Tactic;
 }
 
 export interface Commander {
@@ -168,14 +196,23 @@ export class MilitarySystem {
   }
 
   // ---------- ordu gönderme ----------
-  sendArmy(target: Kingdom): boolean {
+  /** compReq verilirse yalnız o kadar asker gider (eldekiyle sınırlanır);
+      verilmezse tüm ordu yürür. tactic savaş çözümünü etkiler. */
+  sendArmy(target: Kingdom, compReq?: UnitComp, tactic: Tactic = 'dengeli'): boolean {
     const host = this.host;
     const units = host.units();
     if (compTotal(units) <= 0) { host.toast('Ordun yok.', 'bad'); return false; }
-    const c = host.villageCenter();
-    const comp: UnitComp = { spear: units.spear, archer: units.archer, cav: units.cav };
+    const comp: UnitComp = compReq
+      ? {
+          spear: Math.max(0, Math.min(units.spear, Math.floor(compReq.spear))),
+          archer: Math.max(0, Math.min(units.archer, Math.floor(compReq.archer))),
+          cav: Math.max(0, Math.min(units.cav, Math.floor(compReq.cav))),
+        }
+      : { spear: units.spear, archer: units.archer, cav: units.cav };
     const marchSize = compTotal(comp);
-    units.spear = 0; units.archer = 0; units.cav = 0;
+    if (marchSize <= 0) { host.toast('Gönderilecek asker seçilmedi.', 'bad'); return false; }
+    const c = host.villageCenter();
+    units.spear -= comp.spear; units.archer -= comp.archer; units.cav -= comp.cav;
     const cmd = this.freeCommander();
     if (cmd) { cmd.busy = true; host.toast(`⭐ Komutan ${cmd.name} orduya önderlik ediyor.`); }
     this.armies.push({
@@ -184,11 +221,25 @@ export class MilitarySystem {
       tx: target.cx + 0.5, ty: target.cy + 0.5,
       size: marchSize, comp, targetK: target.id,
       returning: false, color: '#ffe9a8', cmdId: cmd ? cmd.id : null,
+      tactic,
     });
     if (target.status === 'ally') host.changeReputation(-25, 'müttefikine saldırdın');
     target.status = 'war';
     target.tradeDeal = false;
-    host.toast(`${marchSize} asker ${target.name} üzerine yürüyor! ⚔️`);
+    host.toast(`${TACTICS[tactic].icon} ${marchSize} asker ${target.name} üzerine yürüyor! ⚔️`);
+    return true;
+  }
+
+  /** Yürüyen oyuncu ordusunu geri çağır (Faz 4). */
+  recall(armyId: number): boolean {
+    const a = this.armies.find(x => x.id === armyId && x.owner === 'player' && !x.returning);
+    if (!a) return false;
+    const c = this.host.villageCenter();
+    a.returning = true;
+    a.targetK = null;
+    a.tx = c.x + 0.5; a.ty = c.y + 0.5;
+    a.color = '#9fe09f';
+    this.host.toast('↩ Ordu geri çağrıldı, köye dönüyor.');
     return true;
   }
 
@@ -313,6 +364,11 @@ export class MilitarySystem {
         if (a.returning) {
           const units = this.host.units();
           for (const t of UNIT_KEYS) units[t] += a.comp[t];
+          // geri çağrılan ordunun komutanı köyde serbest kalır
+          if (a.cmdId !== null) {
+            const cm = this.commanders.find(c => c.id === a.cmdId);
+            if (cm) cm.busy = false;
+          }
           this.armies.splice(ai, 1);
           continue;
         }
@@ -338,14 +394,15 @@ export class MilitarySystem {
       const cmd = a.cmdId !== null
         ? this.commanders.find(c => c.id === a.cmdId) ?? null
         : null;
+      const T = TACTICS[a.tactic ?? 'dengeli'];
       const F = this.battleForces(atkComp, defComp, defWalls, cmd);
       const luck = 0.88 + host.rng() * 0.24;
-      const attPower = F.atk * luck;
+      const attPower = F.atk * luck * T.atk;
 
       if (attPower > F.def) {
         const ratio = F.def / Math.max(1, attPower);
         const lossM = cmd ? this.cmdBonus(cmd, 'loss') : 1;
-        const lost = this.applyLosses(atkComp, Math.min(0.7, ratio * 0.65 * lossM));
+        const lost = this.applyLosses(atkComp, Math.min(0.7, ratio * 0.65 * lossM * T.loss));
         if (cmd) { cmd.busy = false; this.gainCmdXp(cmd, 30 + k.tiles.size); }
         const loot = Math.round(20 + k.tiles.size * 3);
         host.res.gold = Math.min(host.storageCap(), host.res.gold + loot);
@@ -355,6 +412,17 @@ export class MilitarySystem {
         k.relation = -100; k.status = 'war';
         host.toast(`🎉 ${k.name} yenildi! +${loot} altın. Kayıp: ${compLabel(lost)}`, 'good');
         if (k.tiles.size <= 1) host.kingdoms.destroy(k);
+        if (compTotal(atkComp) > 0) this.returnArmy(a, atkComp);
+      } else if (T.retreat) {
+        // ---- temkinli: bozgun yerine düzenli geri çekilme ----
+        const lost = this.applyLosses(atkComp, 0.5 * T.loss);
+        k.army = Math.max(0, k.army - a.size * 0.25);
+        k.relation = -100; k.status = 'war';
+        host.toast(
+          `🛡️ Ordun ${k.name} önünde tutunamadı, düzenli çekildi. Kayıp: ${compLabel(lost)}`,
+          'bad',
+        );
+        if (cmd) { cmd.busy = false; this.gainCmdXp(cmd, 12); } // komutan çekilişi yönetir
         if (compTotal(atkComp) > 0) this.returnArmy(a, atkComp);
       } else {
         const ratio = attPower / Math.max(1, F.def);

@@ -15,10 +15,12 @@
   **Performans turu da tamam:** arazi ön-belleği (TerrainCache) ile karo
   başına 3-4 çizim → karede tek drawImage; sis tek yol+2 doldurma.
   Yazılım render'ında bile 60 fps'e kilitlendi (42-48'den).
-  **FAZ 3 · M1 de TAMAM:** IndexedDB depolama + 3 kayıt slotu +
-  çevrimdışı ilerleme çalışıyor (94 test).
-  Sırada: Faz 4 (savaş derinliği: birim kontrolü, taktik) veya kalan
-  Faz 3 işleri — kullanıcı yönlendirmesine göre.
+  **FAZ 3 · M1 TAMAM** (IndexedDB + 3 slot + çevrimdışı ilerleme).
+  **FAZ 4 · M1 TAMAM** (savaş derinliği): kısmi ordu gönderimi, taktik
+  duruşlar (agresif/dengeli/temkinli+çekilme), geri çağırma, haritada
+  ordu seçimi + canlı bilgi kartı. 101 test yeşil.
+  Sırada: Faz 4 M2 (savaş görselleştirme: çarpışma animasyonu, meydan
+  savaşı efektleri) veya PWA (ana ekrana ekle) — kullanıcıya göre.
 - **Sürüm:** v0.7 (Faz 2 M2) · referans: `prototype/kralliklar-cagi-v0.5.html`.
 - **Son güncelleme:** 2026-07-26 (2. oturum).
 - **Bilinçli ertelenenler:** WebGL atlas / chunk bake (Canvas2D ~42-56 fps
@@ -26,6 +28,26 @@
   ikon çizimleri (Faz 2 M3), kayıt slotları/IndexedDB/çevrimdışı (Faz 3).
 
 ## ✅ Tamamlanan
+### FAZ 4 · M1 — Savaş Derinliği (2. oturum)
+- **Kısmi ordu gönderimi:** `attack` komutu artık `comp` (birim seçimi)
+  ve `tactic` alır; eldekiyle sınırlanır, sıfır seçim reddedilir. Diplomasi
+  "Saldır" → parşömen **Ordu Gönder paneli**: birim başına −/+/hepsi
+  düğmeleri, eldeki sayısı, canlı toplam ("Saldır (25)").
+- **Taktik duruşlar (TACTICS):** 🔥 Agresif (saldırı +%22, kayıp +%25),
+  ⚖️ Dengeli, 🛡️ Temkinli (saldırı -%15, kayıp -%30, bozgunda ordu
+  DAĞILMAZ — yarı kayıpla düzenli çekilir, komutan ölmez/esir düşmez,
+  sağ kalanlar köye döner). Panelde seçili taktik + açıklaması.
+- **Geri çağırma:** `recallArmy` komutu — yürüyen ordu köye döner,
+  askerler orduya, komutan görev listesine geri katılır.
+- **Haritada ordu kontrolü:** yürüyen orduya dokun → altın kesikli vurgu
+  halkası + canlı bilgi kartı (birlik dökümü, hedef, tahmini varış,
+  taktik, komutan) + "↩ Geri Çağır" düğmesi; kart orduyla birlikte
+  0.25sn'de bir tazelenir, ordu biterse kendini kapatır.
+- **Testler: 101/101** — 7 yeni Faz 4 testi (kısmi gönderim, sınırlama,
+  geri çağırma+komutan serbestliği, çift çağırma reddi, temkinli çekilme
+  vs dengeli bozgun, taktikli determinizm, savaş ortasında JSON kayıt
+  roundtrip'i). Tarayıcıda tam akış: diplomasi→panel→temkinli→saldır→
+  yürüyüş→geri çağır; 58 fps, sıfır hata.
 ### FAZ 3 · M1 — IndexedDB + Kayıt Slotları + Çevrimdışı İlerleme (2. oturum)
 - **Depolama katmanı (`ui/storage.ts`):** IndexedDB asıl depo (localStorage
   ~5MB sınırı yok), açılışta tüm kayıtlar belleğe alınır → oyun içi okuma
