@@ -19,6 +19,7 @@ import {
   saveMeta, setActiveSlot, SLOT_COUNT,
 } from './ui/persist';
 import { applyOfflineProgress } from './core/offline';
+import { setupGame, REPLAY_VERSION, type ReplayData } from './core/replay';
 import { RES_ICONS } from './data/buildings';
 import {
   sfx, sndResume, updateMusic, loadSoundPrefs, soundOn, toggleSound,
@@ -91,6 +92,7 @@ let minimap: MiniMap | null = null;
 let sel: TileSel | null = null;
 let ghost: Ghost | null = null;
 let armySel: number | null = null; // haritada seçili oyuncu ordusu (Faz 4)
+let replayKc: number | null = null; // tekrar meta: rakip sayısı (yalnız yeni oyun)
 const stats: RenderStats = { tiles: 0, sprites: 0 };
 
 initToasts(el('toasts'));
@@ -652,6 +654,26 @@ el('m-export').onclick = () => {
   URL.revokeObjectURL(a.href);
   toast('💾 Kayıt indirildi.', 'good');
 };
+el('m-replay').onclick = () => {
+  if (!sim || !world || replayKc === null || !sim.cmdLog) {
+    toast('Tekrar kaydı yok — yalnız bu oturumda BAŞLATILAN oyunlar kaydedilir.', 'bad');
+    return;
+  }
+  const data: ReplayData = {
+    rv: REPLAY_VERSION,
+    seed: world.seed, W: world.W, H: world.H,
+    kingdoms: replayKc,
+    ticks: sim.tickCount,
+    entries: sim.cmdLog,
+  };
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'kralliklar-cagi-tekrar.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast(`🎬 Tekrar indirildi (${sim.cmdLog.length} komut, ${Math.round(sim.tickCount / 600)} dk).`, 'good');
+};
 el('m-import').onclick = () => el<HTMLInputElement>('fileinput').click();
 el<HTMLInputElement>('fileinput').onchange = (e) => {
   const input = e.target as HTMLInputElement;
@@ -766,14 +788,14 @@ function startGame(size: number): void {
   el<HTMLElement>('loadmsg').style.display = 'block';
   setTimeout(() => {
     const seed = (Math.random() * 1e9) | 0; // yalnız tohum üretimi — sim dışı
-    world = new World(size, size, seed);
-    sim = new Sim(world);
-    // rakip krallıklar (boyuta göre) + başlangıç vadisi
+    // rakip krallık sayısı (boyuta göre); kuruluş sırası tekrarla BİREBİR aynı
     const kc = size <= 192 ? (size <= 128 ? 6 : 6) : size <= 256 ? 9 : 13;
-    sim.kingdoms.spawn(kc);
-    sim.wildlife.spawn();
-    const spot = sim.pickStartRegion();
-    sim.revealStartArea(spot.x, spot.y, 25);
+    const r = setupGame(seed, size, size, kc);
+    world = r.world;
+    sim = r.sim;
+    sim.cmdLog = []; // komut kaydı: bu oturumda tekrar dışa aktarılabilir
+    replayKc = kc;
+    const spot = r.spot;
     resetTutorial();
     finishSetup(spot.x, spot.y);
     // ilk görev: köy meydanı yerleştir (hayalet başlangıç vadisinde)
@@ -798,6 +820,7 @@ function continueGame(): void {
     }
     world = r.world;
     sim = r.sim;
+    replayKc = null; // kayıttan devam: tekrar kaydı bu oturumda tutulamaz
     resetTutorial(r.ui.tut);
     // çevrimdışı ilerleme: sen yokken köy kaba üretim yaptı
     const rep = applyOfflineProgress(sim, r.elapsedSec);

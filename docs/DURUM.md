@@ -30,8 +30,11 @@
   yok) 25 dk'lık koşularla eğriyi ölçtü; 4 gerçek denge sorunu bulunup
   düzeltildi (aşağıda). Eğri hedefleri: zincir ~6-9dk, ordu20 ~7-12dk,
   ilk fetih ~10-15dk, açlık ölümü 0. 108 test yeşil.
-  Sırada: çok oyunculu hazırlık (komut kaydı/replay) veya içerik
-  genişletme — kullanıcıya göre.
+  **ÇOK OYUNCULU HAZIRLIK M1 de TAMAM:** komut kaydı + tekrar (replay)
+  altyapısı — "oyun = tohum + komut listesi" artık kanıtlı ve dışa
+  aktarılabilir. 111 test yeşil.
+  Sırada: içerik genişletme, tekrar İZLEYİCİ (replay'i sahnede oynatma)
+  veya gerçek ağ katmanı — kullanıcıya göre.
 - **Sürüm:** v0.7 (Faz 2 M2) · referans: `prototype/kralliklar-cagi-v0.5.html`.
 - **Son güncelleme:** 2026-07-26 (2. oturum).
 - **Bilinçli ertelenenler:** WebGL atlas / chunk bake (Canvas2D ~42-56 fps
@@ -39,6 +42,22 @@
   ikon çizimleri (Faz 2 M3), kayıt slotları/IndexedDB/çevrimdışı (Faz 3).
 
 ## ✅ Tamamlanan
+### ÇOK OYUNCULU HAZIRLIK · M1 — Komut Kaydı + Tekrar (2. oturum)
+- **Mimari kanıt somutlaştı:** `Sim.cmdLog` — başarılı her komut
+  {tick, cmd} olarak loglanır (tickCount kayda da girer). Komutlar tick
+  SINIRLARINDA uygulandığından tekrar aynı sınırda uygular.
+- **`core/replay.ts`:** ReplayData (rv, tohum, boyut, rakip sayısı,
+  tick sayısı, komutlar), `setupGame` (canlı oyunla BİREBİR aynı kuruluş
+  sırası — startGame de artık bunu kullanıyor), `runReplay`,
+  `parseReplay` (şema+sürüm denetimi).
+- **Lockstep kanıtı (test):** bot 8 dakika oynadı (yüzlerce komut,
+  felaketler, savaşlar) → oyun YALNIZ komut listesinden yeniden koşuldu
+  → son durum snapshot'ı BİREBİR eşit. Çok oyunculu için gereken tek
+  şey artık komutları ağdan taşımak.
+- **UI:** menüde "🎬 Tekrarı Dışa Aktar" — bu oturumda başlatılan
+  oyunun tekrarını JSON indirir (komut sayısı + süre bildirimi);
+  kayıttan devam edilen oyunda kibarca reddeder (hizalama tutmaz).
+- **Testler: 111/111**; duman testi 58 fps, sıfır hata.
 ### DENGE TURU — Otomatik Oyuncu + Sabit Ayarı (2. oturum)
 - **Ölçüm aracı (`test/autoplay.ts` + `balance.test.ts`):** oyunu YALNIZ
   komutlarla oynayan bot — inşaat önceliği, işçi yönetimi (bıçkıhaneden

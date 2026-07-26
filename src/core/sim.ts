@@ -123,6 +123,8 @@ export class Sim {
   private starveAcc = 0;
   private popGrowAcc = 0;
   private fogAcc = 0;
+  /** toplam tick sayısı — komut kaydı/tekrar hizalaması (Faz 5) */
+  tickCount = 0;
 
   constructor(world: World) {
     this.world = world;
@@ -354,7 +356,19 @@ export class Sim {
   }
 
   // ---------- komut uygulama ----------
+  /** Başarılı komutlar buraya yazılır (tekrar/lockstep) — null: kayıt yok. */
+  cmdLog: { tick: number; cmd: Command }[] | null = null;
+
   applyCommand(cmd: Command): boolean {
+    const ok = this.execCommand(cmd);
+    if (ok && this.cmdLog) {
+      // komut, N. tick'ten SONRA uygulandı → tekrar aynı sınırda uygular
+      this.cmdLog.push({ tick: this.tickCount, cmd });
+    }
+    return ok;
+  }
+
+  private execCommand(cmd: Command): boolean {
     switch (cmd.kind) {
       case 'place': return this.placeBuilding(cmd.building, cmd.x, cmd.y);
       case 'assign': return this.assignWorker(cmd.x, cmd.y, cmd.delta);
@@ -874,6 +888,7 @@ export class Sim {
   // ---------- ana tick ----------
   tick(dt: number): void {
     if (this.gameOver) return; // oyun bitti — sim durur
+    this.tickCount++; // tekrar/lockstep hizalaması
     for (const v of this.villagers) { v.px = v.x; v.py = v.y; }
     this.updateTime(dt);
     this.constructionTick(dt);
@@ -942,6 +957,7 @@ export class Sim {
       starveAcc: this.starveAcc,
       popGrowAcc: this.popGrowAcc,
       fogAcc: this.fogAcc,
+      tickCount: this.tickCount,
       player: this.player,
       villagers: this.villagers,
       time: this.time,
@@ -972,6 +988,7 @@ export class Sim {
     sim.starveAcc = d.starveAcc;
     sim.popGrowAcc = d.popGrowAcc;
     sim.fogAcc = d.fogAcc;
+    sim.tickCount = (d as { tickCount?: number }).tickCount ?? 0;
     // DİKKAT: sistem host'ları `player.res` ve `player.units` REFERANSLARINI
     // kuruluşta yakalar. Bu nesneler asla değiştirilmemeli — yalnız içerik
     // kopyalanır; yoksa restore sonrası host'lar bayat nesneye yazar.
