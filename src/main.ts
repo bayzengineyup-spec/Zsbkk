@@ -33,7 +33,7 @@ import {
   initTechPanel, openTechPanel, closeTechPanel, refreshTechPanel, techOpen,
 } from './ui/techpanel';
 import { UNITS, UNIT_KEYS, compTotal, compLabel, type UnitComp, type UnitKey } from './data/units';
-import { TACTICS, type Tactic } from './core/military';
+import { TACTICS, RAM_COST, type Tactic } from './core/military';
 import { CMD_TRAITS } from './data/techs';
 import { applyTheme } from './ui/theme';
 
@@ -156,7 +156,8 @@ function refreshArmyInfo(): void {
     ? `⚔️ ${targetName} ile meydan savaşında!`
     : `Hedef: ${targetName} · ~${eta}sn`;
   const cmd = a.cmdId !== null ? sim.military.commanders.find(c => c.id === a.cmdId) : null;
-  el('ti-l3').textContent = `${T.icon} ${T.name}${cmd ? ` · ⭐${cmd.name} sv${cmd.level}` : ''}`;
+  el('ti-l3').textContent =
+    `${T.icon} ${T.name}${a.ram ? ' · 🐏 koçbaşı' : ''}${cmd ? ` · ⭐${cmd.name} sv${cmd.level}` : ''}`;
   act.innerHTML = '';
   act.style.display = 'flex';
   if (!a.returning && !fighting) {
@@ -398,6 +399,7 @@ const armypanel = el<HTMLElement>('armypanel');
 let apKingdom: number | null = null;
 const apComp: UnitComp = { spear: 0, archer: 0, cav: 0 };
 let apTactic: Tactic = 'dengeli';
+let apRam = false; // koçbaşı (Faz 4 M3)
 
 function closeArmyPanel(): void {
   armypanel.classList.remove('show');
@@ -445,7 +447,20 @@ function renderArmyPanel(): void {
     b.onclick = () => { apTactic = t; renderArmyPanel(); };
     tacts.appendChild(b);
   }
-  el('ap-desc').textContent = TACTICS[apTactic].desc;
+  // koçbaşı: sur savunmasını yarıya indirir (tek kullanımlık)
+  const extra = el<HTMLElement>('ap-extra');
+  extra.innerHTML = '';
+  const ramBtn = document.createElement('button');
+  const ramOk = sim.canAfford(RAM_COST);
+  if (apRam && !ramOk) apRam = false;
+  ramBtn.className = apRam ? 'on' : '';
+  ramBtn.textContent = `🐏 Koçbaşı (${costStr(RAM_COST)}) — surları yarıya indirir`;
+  ramBtn.disabled = !ramOk && !apRam;
+  ramBtn.onclick = () => { apRam = !apRam; renderArmyPanel(); };
+  extra.appendChild(ramBtn);
+  el('ap-desc').textContent = apRam
+    ? `${TACTICS[apTactic].desc} · 🐏 surların etkisi yarıya iner`
+    : TACTICS[apTactic].desc;
   const total = compTotal(apComp);
   const go = el<HTMLButtonElement>('ap-go');
   go.textContent = total > 0 ? `⚔️ Saldır (${total})` : '⚔️ Saldır';
@@ -456,6 +471,7 @@ function openArmyPanel(kingdomId: number): void {
   if (!sim) return;
   cancelPlace(); closeBuildPanel(); hideInfo();
   apKingdom = kingdomId;
+  apRam = false;
   // varsayılan: tüm ordu seçili
   apComp.spear = sim.player.units.spear;
   apComp.archer = sim.player.units.archer;
@@ -469,7 +485,7 @@ el<HTMLButtonElement>('ap-go').onclick = () => {
   if (!sim || apKingdom === null) return;
   const ok = sim.applyCommand({
     kind: 'attack', kingdomId: apKingdom,
-    comp: { ...apComp }, tactic: apTactic,
+    comp: { ...apComp }, tactic: apTactic, ram: apRam,
   });
   if (ok) { haptic(25); closeArmyPanel(); refreshHUD(); }
 };

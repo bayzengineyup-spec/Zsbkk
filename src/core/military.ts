@@ -57,10 +57,15 @@ export interface Army {
   tactic?: Tactic;
   /** kalan meydan savaşı süresi (sn) — varışta başlar, bitince çözülür */
   fighting?: number;
+  /** koçbaşı taşıyor — hedef surlarının etkisi yarıya iner (Faz 4 M3) */
+  ram?: boolean;
 }
 
 /** Meydan savaşı süresi (sn) — çarpışma haritada izlenir (Faz 4 M2). */
 export const BATTLE_TIME = 4;
+
+/** Koçbaşı maliyeti — saldırı başına bir kez ödenir, geri gelmez. */
+export const RAM_COST: Cost = { wood: 80, plank: 20 };
 
 export interface Commander {
   id: number;
@@ -98,6 +103,8 @@ export interface MilitaryHost {
   changeReputation(delta: number, reason: string): void;
   year(): number;
   toast(msg: string, kind?: '' | 'good' | 'bad'): void;
+  /** baskın başarılı olursa köyde bir bina ateşe verilir (Faz 4 M3) */
+  igniteRandomBuilding(): void;
 }
 
 export class MilitarySystem {
@@ -202,11 +209,16 @@ export class MilitarySystem {
 
   // ---------- ordu gönderme ----------
   /** compReq verilirse yalnız o kadar asker gider (eldekiyle sınırlanır);
-      verilmezse tüm ordu yürür. tactic savaş çözümünü etkiler. */
-  sendArmy(target: Kingdom, compReq?: UnitComp, tactic: Tactic = 'dengeli'): boolean {
+      verilmezse tüm ordu yürür. tactic savaş çözümünü etkiler.
+      ram: koçbaşı — maliyeti öder, hedef surlarını yarıya indirir. */
+  sendArmy(target: Kingdom, compReq?: UnitComp, tactic: Tactic = 'dengeli', ram = false): boolean {
     const host = this.host;
     const units = host.units();
     if (compTotal(units) <= 0) { host.toast('Ordun yok.', 'bad'); return false; }
+    if (ram && !host.canAfford(RAM_COST)) {
+      host.toast('Koçbaşı için 🪵80 🪚20 gerekli.', 'bad');
+      return false;
+    }
     const comp: UnitComp = compReq
       ? {
           spear: Math.max(0, Math.min(units.spear, Math.floor(compReq.spear))),
@@ -218,6 +230,10 @@ export class MilitarySystem {
     if (marchSize <= 0) { host.toast('Gönderilecek asker seçilmedi.', 'bad'); return false; }
     const c = host.villageCenter();
     units.spear -= comp.spear; units.archer -= comp.archer; units.cav -= comp.cav;
+    if (ram) {
+      host.pay(RAM_COST);
+      host.toast('🐏 Koçbaşı hazırlandı — surlar yarı yarıya etkisiz.');
+    }
     const cmd = this.freeCommander();
     if (cmd) { cmd.busy = true; host.toast(`⭐ Komutan ${cmd.name} orduya önderlik ediyor.`); }
     this.armies.push({
@@ -226,7 +242,7 @@ export class MilitarySystem {
       tx: target.cx + 0.5, ty: target.cy + 0.5,
       size: marchSize, comp, targetK: target.id,
       returning: false, color: '#ffe9a8', cmdId: cmd ? cmd.id : null,
-      tactic,
+      tactic, ram,
     });
     if (target.status === 'ally') host.changeReputation(-25, 'müttefikine saldırdın');
     target.status = 'war';
@@ -411,7 +427,8 @@ export class MilitarySystem {
       const k = host.kingdoms.byId(a.targetK as number);
       if (!k) return;
       const defComp = this.kingdomComp(k);
-      const defWalls = Math.min(20, k.tiles.size * 0.25);
+      // koçbaşı hedef surlarının etkisini yarıya indirir
+      const defWalls = Math.min(20, k.tiles.size * 0.25) * (a.ram ? 0.5 : 1);
       const cmd = a.cmdId !== null
         ? this.commanders.find(c => c.id === a.cmdId) ?? null
         : null;
@@ -484,6 +501,9 @@ export class MilitarySystem {
         host.losePop(popLoss);
         host.addHappy(-20);
         host.toast(`💀 Baskın! ${lootG} altın, ${lootF} yiyecek yağmalandı, ${popLoss} can gitti.`, 'bad');
+        // yağmacılar giderken ateşe verir (Faz 4 M3): biri kesin, ikincisi şansa
+        host.igniteRandomBuilding();
+        if (host.rng() < 0.35) host.igniteRandomBuilding();
       } else {
         const ratio = attPower / Math.max(1, F.def);
         const lost = this.applyLosses(host.units(), Math.min(0.6, ratio * 0.45));

@@ -229,6 +229,16 @@ export class Sim {
       changeReputation: (d, r) => this.changeReputation(d, r),
       year: () => this.time.year,
       toast: (msg, kind) => this.toast(msg, kind ?? ''),
+      igniteRandomBuilding: () => {
+        // yağmacılar bir binayı ateşe verir (sur hariç — taş yanmaz)
+        const list = this.player.buildings.filter(b =>
+          isActive(b) && !b.burning && b.type !== 'wall');
+        if (!list.length) return;
+        const b = list[(this.rng() * list.length) | 0];
+        b.burning = true;
+        b.hp = b.hp ?? 100;
+        this.toast(`🔥 Baskında ${BUILDINGS[b.type].name} ateşe verildi!`, 'bad');
+      },
     };
     this.military = new MilitarySystem(militaryHost);
 
@@ -357,7 +367,9 @@ export class Sim {
       case 'train': return this.military.train(cmd.unit);
       case 'attack': {
         const k = this.kingdoms.byId(cmd.kingdomId);
-        return k ? this.military.sendArmy(k, cmd.comp, cmd.tactic ?? 'dengeli') : false;
+        return k
+          ? this.military.sendArmy(k, cmd.comp, cmd.tactic ?? 'dengeli', cmd.ram ?? false)
+          : false;
       }
       case 'recallArmy': return this.military.recall(cmd.armyId);
       case 'research': return this.tech.research(cmd.techId);

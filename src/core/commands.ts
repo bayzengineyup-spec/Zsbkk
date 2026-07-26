@@ -18,8 +18,8 @@ export type Command =
   | { kind: 'extinguish'; x: number; y: number }
   | { kind: 'diplo'; kingdomId: number; action: DiploAction }
   | { kind: 'train'; unit: UnitKey }
-  /** comp verilmezse tüm ordu; tactic verilmezse dengeli (Faz 4) */
-  | { kind: 'attack'; kingdomId: number; comp?: UnitComp; tactic?: Tactic }
+  /** comp verilmezse tüm ordu; tactic verilmezse dengeli; ram = koçbaşı (Faz 4) */
+  | { kind: 'attack'; kingdomId: number; comp?: UnitComp; tactic?: Tactic; ram?: boolean }
   | { kind: 'recallArmy'; armyId: number }
   | { kind: 'research'; techId: TechId }
   | { kind: 'recruitCommander' };

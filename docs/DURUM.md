@@ -22,10 +22,12 @@
   **FAZ 4 · M2 de TAMAM:** meydan savaşları artık süreli (4sn) ve haritada
   izleniyor — toz bulutu, çarpışan iki taraf, kıvılcımlar, çift sancak.
   103 test yeşil.
-  **PWA de TAMAM:** manifest + kale ikonları + service worker; telefonda
-  "ana ekrana ekle" ve tam ÇEVRİMDIŞI açılış çalışıyor (testli).
-  Sırada: Faz 4 M3 (kuşatma/savunma derinliği), zafer/ilerleme dengesi
-  turu veya çok oyunculu hazırlık — kullanıcıya göre.
+  **PWA TAMAM** (ana ekrana ekle + çevrimdışı açılış, testli).
+  **FAZ 4 · M3 de TAMAM:** 🐏 koçbaşı (sur etkisi ×0.5, 🪵80+🪚20) ve
+  başarılı baskında binaların ateşe verilmesi (mevcut yangın sistemiyle).
+  106 test yeşil.
+  Sırada: denge/ilerleme turu, zafer koşulları cilası veya çok oyunculu
+  hazırlık (komut kaydı/replay) — kullanıcıya göre.
 - **Sürüm:** v0.7 (Faz 2 M2) · referans: `prototype/kralliklar-cagi-v0.5.html`.
 - **Son güncelleme:** 2026-07-26 (2. oturum).
 - **Bilinçli ertelenenler:** WebGL atlas / chunk bake (Canvas2D ~42-56 fps
@@ -33,6 +35,18 @@
   ikon çizimleri (Faz 2 M3), kayıt slotları/IndexedDB/çevrimdışı (Faz 3).
 
 ## ✅ Tamamlanan
+### FAZ 4 · M3 — Kuşatma & Savunma (2. oturum)
+- **🐏 Koçbaşı:** saldırı başına tek kullanımlık (🪵80 + 🪚20, geri
+  gelmez); hedef surlarının savunma katkısını YARIYA indirir. Ordu
+  panelinde tam satır düğme + açıklama; kaynak yoksa saldırı reddedilir;
+  ordu bilgi kartında 🐏 rozeti. Kayda girer (Army.ram).
+- **Baskında yangın:** düşman/barbar baskını köyü ele geçirirse
+  yağmacılar giderken BİR binayı kesin, ikincisini %35 şansla ateşe
+  verir (mevcut yangın sistemi: yayılma + söndürme komutu devrede;
+  surlar taş olduğundan yanmaz). Savunmanın bedeli artık görünür.
+- **Testler: 106/106** — koçbaşının savaşı çevirmesi (aynı tohumda
+  koçbaşısız yenilgi / koçbaşılı zafer + maliyet düşümü), kaynak yoksa
+  reddetme, başarılı baskında yangın çıkması. 60 fps, sıfır hata.
 ### PWA — Ana Ekrana Ekle + Çevrimdışı (2. oturum)
 - **Manifest (`public/manifest.webmanifest`):** ad, standalone görünüm,
   tema renkleri (ahşap koyu), TR dili, oyun kategorisi.

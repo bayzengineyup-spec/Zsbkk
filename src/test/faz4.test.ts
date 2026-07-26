@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { World } from '../core/world';
 import { Sim } from '../core/sim';
-import { BATTLE_TIME } from '../core/military';
+import { BATTLE_TIME, RAM_COST } from '../core/military';
 import { compTotal } from '../data/units';
 import { completeAll, findLand } from './helpers';
 
@@ -166,6 +166,60 @@ describe('Faz 4 — savaş derinliği', () => {
     expect(s2.military.armies[0].fighting).toBeCloseTo(s.military.armies[0].fighting!, 5);
     settle(s); settle(s2);
     expect(JSON.stringify(s.snapshot())).toBe(JSON.stringify(s2.snapshot()));
+  });
+
+  it('koçbaşı: maliyeti öder, surlu hedefe karşı savaşı çevirir', () => {
+    const run = (ram: boolean): { won: boolean; wood: number } => {
+      const { s, kId } = warVillage(88);
+      const k = s.kingdoms.byId(kId)!;
+      // surlu büyük kale: 80+ karo → defWalls = 20 (tavan), savunan asker yok
+      for (let i = 0; i < 90; i++) k.tiles.add(10000 + i);
+      k.army = 0;
+      s.player.units.spear = 5; // 5 mızrakçı ≈ 45 saldırı — sur 44'e yetmez ama 22'yi aşar
+      s.player.res.wood = 500; s.player.res.plank = 100;
+      const goldBefore = s.player.res.gold;
+      expect(s.applyCommand({ kind: 'attack', kingdomId: kId, ram })).toBe(true);
+      settle(s);
+      return { won: s.player.res.gold > goldBefore, wood: s.player.res.wood };
+    };
+    const without = run(false);
+    const withRam = run(true);
+    expect(withRam.won).toBe(true);                 // koçbaşıyla surlar aşıldı
+    expect(without.won).toBe(false);                // koçbaşısız surlar dayandı
+    expect(withRam.wood).toBe(500 - (RAM_COST.wood ?? 0)); // maliyet ödendi
+  });
+
+  it('koçbaşı kaynak yoksa saldırı reddedilir', () => {
+    const { s, kId } = warVillage();
+    s.player.units.spear = 5;
+    s.player.res.wood = 10; s.player.res.plank = 0;
+    expect(s.applyCommand({ kind: 'attack', kingdomId: kId, ram: true })).toBe(false);
+    expect(s.military.armies.length).toBe(0);
+  });
+
+  it('başarılı baskın binaları ateşe verir', () => {
+    const { s } = warVillage(13);
+    // savunmasız köy + birkaç bina
+    const c = s.villageCenter();
+    s.player.res.wood = 900; s.player.res.stone = 500; s.player.res.food = 3000;
+    let placed = 0;
+    for (let dy = -3; dy <= 3 && placed < 3; dy++) {
+      for (let dx = -3; dx <= 3 && placed < 3; dx++) {
+        if (!dx && !dy) continue;
+        if (s.canPlaceOn('house', c.x + dx, c.y + dy)) {
+          s.applyCommand({ kind: 'place', building: 'house', x: c.x + dx, y: c.y + dy });
+          placed++;
+        }
+      }
+    }
+    completeAll(s);
+    s.player.units.spear = 0; s.player.units.archer = 0; s.player.units.cav = 0;
+    // dev barbar akını — kesin baskın
+    expect(s.military.barbarianRaid()).toBe(true);
+    s.military.armies[0].size = 200;
+    s.military.armies[0].comp = { spear: 200, archer: 0, cav: 0 };
+    settle(s);
+    expect(s.player.buildings.some(b => b.burning)).toBe(true); // yangın çıktı
   });
 
   it('savaş ortasında kayıt: taktik ve geri çağırma durumu korunur', () => {
