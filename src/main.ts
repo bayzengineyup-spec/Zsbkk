@@ -14,7 +14,13 @@ import { drawScene, type Frame, type Ghost, type RenderStats, type TileSel } fro
 import { MiniMap } from './render/minimap';
 import { TouchInput } from './ui/input';
 import { initToasts, toast } from './ui/toast';
-import { saveNow, hasSave, restoreGame, clearSave } from './ui/persist';
+import { saveNow, hasSave, restoreGame, clearSave, exportSave, importSave } from './ui/persist';
+import {
+  sfx, sndResume, updateMusic, loadSoundPrefs, soundOn, toggleSound,
+  getMusicVol, getSfxVol, setMusicVol, setSfxVol,
+} from './ui/sound';
+import { Tut, initTutorial, resetTutorial, updateTutorial } from './ui/tutorial';
+import { timeOfDayLabel } from './render/daynight';
 import {
   initDiplo, openDiploPanel, closeDiploPanel, refreshDiploPanel, diploOpen,
 } from './ui/diplo';
@@ -85,7 +91,8 @@ function refreshHUD(): void {
   el('r-army').textContent = String(compTotal(p.units));
   el('r-happy').textContent = `%${Math.round(p.happy)}`;
   const s = sim.currentSeason();
-  el('r-season').textContent = `${s.icon} ${s.name} · ${sim.time.year}. yıl`;
+  el('r-season').textContent =
+    `${s.icon} ${s.name} · ${sim.time.year}. yıl · ${timeOfDayLabel(sim.time.t)}`;
   // aktif etkiler (veba, sert kış, altın çağ…)
   el('efxbar').innerHTML = sim.events.activeEffects
     .map(e => `<div class="efx">${e.icon} <b>${e.name}</b> · ${Math.ceil(e.timer)}sn</div>`)
@@ -263,7 +270,7 @@ function confirmPlace(): void {
     cancelPlace();
     if (wasCenter) hint(null);
     refreshHUD();
-    saveNow(sim); // önemli eylem sonrası anında kayıt
+    saveNow(sim, { tut: { ...Tut } }); // önemli eylem sonrası anında kayıt
   } else {
     updateGhostValidity();
   }
@@ -284,6 +291,35 @@ el<HTMLButtonElement>('pb-cancel').onclick = () => {
     hint('Köy kurmak için önce Köy Meydanı gerekli — İnşa menüsünden seç');
   }
 };
+
+// ---------- ses ----------
+loadSoundPrefs();
+window.addEventListener('pointerdown', () => sndResume(), { once: true });
+
+/** Sim bildirimlerinden ses efekti çıkar (kaba eşleme — M5). */
+function sfxForToast(msg: string, kind: string): void {
+  if (msg.includes('kuruldu') || msg.includes('yıkıldı')) sfx('build');
+  else if (msg.includes('eğitildi')) sfx('train');
+  else if (msg.includes('YANGIN') || msg.includes('sıçradı') || msg.includes('kül oldu')) sfx('fire');
+  else if (msg.includes('DEPREM')) sfx('quake');
+  else if (msg.includes('doğdu')) sfx('birth');
+  else if (msg.includes('öldü') || msg.includes('can aldı')) sfx('death');
+  else if (msg.includes('altın') && kind === 'good') sfx('coin');
+  else if (msg.includes('AKINI') || msg.includes('saldırı ordusu') || msg.includes('üzerine yürüyor')) sfx('horn');
+  else if (msg.includes('yenildi') || msg.includes('bozguna') || msg.includes('püskürttün') || msg.includes('Baskın')) sfx('battle');
+  else if (msg.includes('araştırıldı')) sfx('research');
+  else if (msg.includes('seviye')) sfx('levelup');
+  else if (kind === 'bad') sfx('error');
+}
+
+// ---------- öğretici ----------
+initTutorial({
+  box: el('tutbox'),
+  onStepDone: (title, allDone) => {
+    if (allDone) { toast('🎓 Öğretici tamamlandı! Artık krallığın senin.', 'good'); sfx('victory'); }
+    else { toast(`✓ ${title} tamam!`, 'good'); sfx('levelup'); }
+  },
+});
 
 // ---------- girdi ----------
 function haptic(ms: number): void {
@@ -361,8 +397,70 @@ el('b-center').onclick = () => {
   cam.focusOn(c.x, c.y, world);
   haptic(10);
 };
-el('b-new').onclick = () => {
-  if (sim && !sim.gameOver) saveNow(sim); // mevcut oyunu kaybetme
+// ---------- menü paneli ----------
+const menupanel = el<HTMLElement>('menupanel');
+const bMenu = el<HTMLElement>('b-menu');
+
+function closeMenu(): void {
+  menupanel.classList.remove('show');
+  bMenu.classList.remove('on');
+}
+
+function refreshMenu(): void {
+  el('m-sound').textContent = soundOn() ? '🔊 Ses: Açık' : '🔇 Ses: Kapalı';
+  el<HTMLInputElement>('m-music').value = String(Math.round(getMusicVol() * 100));
+  el<HTMLInputElement>('m-sfx').value = String(Math.round(getSfxVol() * 100));
+}
+
+bMenu.onclick = () => {
+  if (menupanel.classList.contains('show')) closeMenu();
+  else {
+    cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech();
+    refreshMenu();
+    menupanel.classList.add('show');
+    bMenu.classList.add('on');
+  }
+};
+
+el('m-sound').onclick = () => { toggleSound(!soundOn()); refreshMenu(); };
+el<HTMLInputElement>('m-music').oninput = (e) => {
+  setMusicVol(parseInt((e.target as HTMLInputElement).value, 10) / 100);
+};
+el<HTMLInputElement>('m-sfx').oninput = (e) => {
+  setSfxVol(parseInt((e.target as HTMLInputElement).value, 10) / 100);
+  sfx('click');
+};
+el('m-export').onclick = () => {
+  if (sim) saveNow(sim, { tut: { ...Tut } }); // en güncel durumu yaz
+  const json = exportSave();
+  if (!json) { toast('Dışa aktarılacak kayıt yok.', 'bad'); return; }
+  const blob = new Blob([json], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'kralliklar-cagi-kayit.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('💾 Kayıt indirildi.', 'good');
+};
+el('m-import').onclick = () => el<HTMLInputElement>('fileinput').click();
+el<HTMLInputElement>('fileinput').onchange = (e) => {
+  const input = e.target as HTMLInputElement;
+  const f = input.files?.[0];
+  input.value = '';
+  if (!f) return;
+  void f.text().then(txt => {
+    if (importSave(txt)) {
+      toast('📂 Kayıt yüklendi, oyun açılıyor…', 'good');
+      closeMenu();
+      continueGame();
+    } else {
+      toast('Geçersiz veya eski sürüm kayıt dosyası.', 'bad');
+    }
+  });
+};
+el('m-new').onclick = () => {
+  if (sim && !sim.gameOver) saveNow(sim, { tut: { ...Tut } }); // mevcut oyunu kaybetme
+  closeMenu();
   el('boot').style.display = 'flex';
   refreshBootButtons();
   world = null; sim = null; minimap = null;
@@ -461,8 +559,10 @@ function startGame(size: number): void {
     // rakip krallıklar (boyuta göre) + başlangıç vadisi
     const kc = size <= 192 ? (size <= 128 ? 6 : 6) : size <= 256 ? 9 : 13;
     sim.kingdoms.spawn(kc);
+    sim.wildlife.spawn();
     const spot = sim.pickStartRegion();
     sim.revealStartArea(spot.x, spot.y, 25);
+    resetTutorial();
     finishSetup(spot.x, spot.y);
     // ilk görev: köy meydanı yerleştir (hayalet başlangıç vadisinde)
     enterPlace('center');
@@ -486,6 +586,7 @@ function continueGame(): void {
     }
     world = r.world;
     sim = r.sim;
+    resetTutorial(r.ui.tut);
     const c = sim.villageCenter();
     finishSetup(c.x, c.y);
     if (!sim.player.hasCenter) {
@@ -509,11 +610,11 @@ refreshBootButtons();
 
 // ---------- otomatik kayıt ----------
 // aralıklı + uygulama arka plana geçince (docs/10-KAYIT); biten oyun kaydedilmez
-setInterval(() => { if (sim && !sim.gameOver) saveNow(sim); }, 20000);
+setInterval(() => { if (sim && !sim.gameOver) saveNow(sim, { tut: { ...Tut } }); }, 20000);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden' && sim && !sim.gameOver) saveNow(sim);
+  if (document.visibilityState === 'hidden' && sim && !sim.gameOver) saveNow(sim, { tut: { ...Tut } });
 });
-window.addEventListener('pagehide', () => { if (sim && !sim.gameOver) saveNow(sim); });
+window.addEventListener('pagehide', () => { if (sim && !sim.gameOver) saveNow(sim, { tut: { ...Tut } }); });
 
 // ---------- döngü ----------
 const SIM_HZ = 10, SIM_STEP = 1 / SIM_HZ;
@@ -538,8 +639,12 @@ function loop(t: number): void {
     if (guard >= 5) simAcc = 0;
     alpha = Math.max(0, Math.min(1, simAcc / SIM_STEP));
 
-    // sim olaylarını bildirime çevir
-    for (const ev of sim.drainEvents()) toast(ev.msg, ev.kind);
+    // sim olaylarını bildirim + sese çevir
+    for (const ev of sim.drainEvents()) {
+      toast(ev.msg, ev.kind);
+      sfxForToast(ev.msg, ev.kind);
+    }
+    updateMusic(sim);
 
     input.applyMomentum(dt);
     if (ghost) updateGhostValidity();
@@ -553,7 +658,7 @@ function loop(t: number): void {
     minimap.draw(mmx, cam, view, sim, dt);
 
     hudAcc += dt;
-    if (hudAcc >= 0.25) { hudAcc = 0; refreshHUD(); }
+    if (hudAcc >= 0.25) { hudAcc = 0; refreshHUD(); updateTutorial(sim); }
 
     if (sim.gameOver) showEndScreen();
   }

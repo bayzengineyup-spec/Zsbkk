@@ -14,6 +14,8 @@ import { EventSystem, type EventHost } from './events';
 import { KingdomSystem, type KingdomHost } from './kingdoms';
 import { TechSystem, type TechHost } from './tech';
 import { MilitarySystem, type MilitaryHost } from './military';
+import { WildlifeSystem, type WildlifeHost } from './wildlife';
+import { CaravanSystem, type CaravanHost } from './caravans';
 import {
   BUILDINGS, BASE_STORAGE,
   type BuildingType, type Cost, type ResKey,
@@ -85,6 +87,8 @@ export class Sim {
   readonly kingdoms: KingdomSystem;
   readonly tech: TechSystem;
   readonly military: MilitarySystem;
+  readonly wildlife: WildlifeSystem;
+  readonly caravans: CaravanSystem;
   gameOver: GameOver | null = null;
 
   /** Sis: 0 = hiç görülmedi, 1 = keşfedildi, 2 = şu an görüşte */
@@ -203,6 +207,28 @@ export class Sim {
       toast: (msg, kind) => this.toast(msg, kind ?? ''),
     };
     this.military = new MilitarySystem(militaryHost);
+
+    const wildlifeHost: WildlifeHost = {
+      rng: this.rng,
+      world: this.world,
+      villagers: () => this.villagers,
+      buildings: () => this.player.buildings,
+    };
+    this.wildlife = new WildlifeSystem(wildlifeHost);
+
+    const caravanHost: CaravanHost = {
+      rng: this.rng,
+      world: this.world,
+      kingdoms: this.kingdoms,
+      hasCenter: () => this.player.hasCenter,
+      villageCenter: () => this.villageCenter(),
+      addGold: (n) => {
+        this.player.res.gold = Math.min(this.player.storageCap, this.player.res.gold + n);
+      },
+      marketMult: () => this.tech.trade(),
+      toast: (msg, kind) => this.toast(msg, kind ?? ''),
+    };
+    this.caravans = new CaravanSystem(caravanHost);
   }
 
   hasBarracks(): boolean {
@@ -673,6 +699,8 @@ export class Sim {
     this.updateVillagers(dt);
     this.kingdoms.tick(dt);
     this.military.tick(dt);
+    this.wildlife.tick(dt);
+    this.caravans.tick(dt);
     // sis: her tick değil, ~saniyede 2 kez (performans)
     this.fogAcc += dt;
     if (this.fogAcc >= 0.5) {
@@ -737,6 +765,8 @@ export class Sim {
       kingdoms: this.kingdoms.serialize(),
       tech: this.tech.serialize(),
       military: this.military.serialize(),
+      wildlife: this.wildlife.serialize(),
+      caravans: this.caravans.serialize(),
       gameOver: this.gameOver,
       vis: Array.from(this.vis),
       lastVisible: this.lastVisible,
@@ -749,6 +779,7 @@ export class Sim {
       rngState: number; nextVID: number; starveAcc: number; popGrowAcc: number;
       fogAcc: number; player: PlayerState; villagers: Villager[]; time: TimeState;
       events: unknown; kingdoms: unknown; tech: unknown; military: unknown;
+      wildlife: unknown; caravans: unknown;
       gameOver: GameOver | null; vis: number[]; lastVisible: number[];
     };
     const sim = new Sim(world);
@@ -774,6 +805,8 @@ export class Sim {
     sim.kingdoms.restore(d.kingdoms);
     sim.tech.restore(d.tech);
     sim.military.restore(d.military);
+    sim.wildlife.restore(d.wildlife);
+    sim.caravans.restore(d.caravans);
     sim.gameOver = d.gameOver;
     sim.vis.set(d.vis);
     sim.lastVisible = d.lastVisible;

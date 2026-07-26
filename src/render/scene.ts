@@ -8,11 +8,14 @@
    ============================================================ */
 import type { World } from '../core/world';
 import type { Sim, Building, Villager } from '../core/sim';
+import type { Creature } from '../core/wildlife';
 import type { BuildingType } from '../data/buildings';
 import type { ResourceKind } from '../data/biomes';
+import { SPECIES } from '../data/species';
 import { Camera, TILE_W, TILE_H, type Viewport } from './camera';
 import { shadeBucket, type TileSprite } from './tiles';
 import type { BuildingSprite } from './buildings';
+import { dayTint } from './daynight';
 
 export interface TileSel { gx: number; gy: number; }
 
@@ -84,6 +87,98 @@ function drawFlames(f: Frame, sx: number, sy: number): void {
   ctx.arc(sx + fl2 * 3 * z, baseY - (18 + fl * 5) * z, (4 + fl * 2) * z, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 1;
+}
+
+/** Hayvan (yer tutucu dört ayaklı — iskelet animasyonu Faz 2'de). */
+function drawCreature(f: Frame, c: Creature): void {
+  const { ctx, cam, world } = f;
+  const z = cam.zoom;
+  const S = SPECIES[c.sp];
+  const rx = c.px + (c.x - c.px) * f.alpha;
+  const ry = c.py + (c.y - c.py) * f.alpha;
+  const ix = Math.max(0, Math.min(world.W - 1, rx | 0));
+  const iy = Math.max(0, Math.min(world.H - 1, ry | 0));
+  const h = world.height[world.idx(ix, iy)];
+  const p = cam.worldToScreen(rx - 0.5, ry - 0.5, h);
+  const s = c.scale * z * 0.55;
+  const dir = c.flip ? -1 : 1;
+  const moving = Math.abs(c.x - c.px) + Math.abs(c.y - c.py) > 0.001;
+  const walk = moving ? Math.sin(c.bob * 4) : 0;
+
+  // gölge
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + 1 * z, S.len * 0.5 * s, S.hgt * 0.22 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // bacaklar
+  ctx.strokeStyle = S.dark;
+  ctx.lineWidth = 1.4 * s;
+  const legY = p.y - S.hgt * 0.45 * s;
+  for (let i = 0; i < 4; i++) {
+    const lx = p.x + (i < 2 ? -1 : 1) * S.len * 0.28 * s * dir + (i % 2 ? 1.2 * s : -1.2 * s);
+    const sw = walk * 1.6 * s * (i % 2 ? 1 : -1);
+    ctx.beginPath();
+    ctx.moveTo(lx, legY);
+    ctx.lineTo(lx + sw, p.y + 0.5 * z);
+    ctx.stroke();
+  }
+  // gövde
+  ctx.fillStyle = S.body;
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y - S.hgt * 0.62 * s, S.len * 0.5 * s, S.hgt * 0.42 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // karın
+  ctx.fillStyle = S.belly;
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y - S.hgt * 0.45 * s, S.len * 0.38 * s, S.hgt * 0.2 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // kafa + kulak
+  const hx = p.x + S.len * 0.52 * s * dir;
+  const hy = p.y - S.hgt * 0.85 * s + walk * 0.4 * s;
+  ctx.fillStyle = S.body;
+  ctx.beginPath();
+  ctx.arc(hx, hy, S.hgt * 0.3 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = S.dark;
+  ctx.beginPath();
+  ctx.arc(hx + 1.5 * s * dir, hy - S.hgt * 0.28 * s, S.hgt * 0.12 * s, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/** Ticaret kervanı (yer tutucu): araba + tekerlekler + krallık flaması. */
+function drawCaravan(f: Frame, sx: number, sy: number, color: string): void {
+  const { ctx } = f;
+  const z = f.cam.zoom;
+  // gölge
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + 1 * z, 7 * z, 2.5 * z, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // tekerlekler
+  ctx.fillStyle = '#4a3a26';
+  ctx.beginPath(); ctx.arc(sx - 4 * z, sy, 2.4 * z, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(sx + 4 * z, sy, 2.4 * z, 0, Math.PI * 2); ctx.fill();
+  // kasa + tente
+  ctx.fillStyle = '#7a5c38';
+  ctx.fillRect(sx - 6 * z, sy - 7 * z, 12 * z, 5.5 * z);
+  ctx.fillStyle = '#d8cbb0';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy - 7.5 * z, 6.4 * z, 3.6 * z, 0, Math.PI, 0);
+  ctx.fill();
+  // flama
+  ctx.strokeStyle = '#2c241c';
+  ctx.lineWidth = z;
+  ctx.beginPath();
+  ctx.moveTo(sx + 5 * z, sy - 8 * z);
+  ctx.lineTo(sx + 5 * z, sy - 14 * z);
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(sx + 5 * z, sy - 14 * z);
+  ctx.lineTo(sx + 9 * z, sy - 12.7 * z);
+  ctx.lineTo(sx + 5 * z, sy - 11.5 * z);
+  ctx.closePath();
+  ctx.fill();
 }
 
 /** Yürüyen ordu (yer tutucu): asker kümesi + sancak + sayı rozeti. */
@@ -257,9 +352,10 @@ export function drawScene(f: Frame): void {
   minGx = Math.max(0, minGx - M); maxGx = Math.min(world.W - 1, maxGx + M);
   minGy = Math.max(0, minGy - M); maxGy = Math.min(world.H - 1, maxGy + M);
 
-  // binalar + köylüler karo kovalarına (yalnız görünür alan için)
+  // binalar + köylüler + hayvanlar karo kovalarına (yalnız görünür alan)
   const bMap = new Map<number, Building>();
   const vMap = new Map<number, Villager[]>();
+  const cMap = new Map<number, Creature[]>();
   if (sim) {
     for (const b of sim.player.buildings) bMap.set(world.idx(b.x, b.y), b);
     for (const v of sim.villagers) {
@@ -269,6 +365,14 @@ export function drawScene(f: Frame): void {
       let arr = vMap.get(i);
       if (!arr) { arr = []; vMap.set(i, arr); }
       arr.push(v);
+    }
+    for (const c of sim.wildlife.creatures) {
+      const ix = c.x | 0, iy = c.y | 0;
+      if (ix < minGx - 1 || ix > maxGx + 1 || iy < minGy - 1 || iy > maxGy + 1) continue;
+      const i = iy * world.W + ix;
+      let arr = cMap.get(i);
+      if (!arr) { arr = []; cMap.set(i, arr); }
+      arr.push(c);
     }
   }
 
@@ -335,9 +439,13 @@ export function drawScene(f: Frame): void {
         if (b.burning) drawFlames(f, c.x, c.y);
       }
 
-      // bu karodaki köylüler (yalnız görüş alanında)
-      const vs = visLevel === 2 ? vMap.get(i) : undefined;
-      if (vs) for (const v of vs) drawVillager(f, v);
+      // bu karodaki köylüler + hayvanlar (yalnız görüş alanında)
+      if (visLevel === 2) {
+        const cs = cMap.get(i);
+        if (cs) for (const cr of cs) drawCreature(f, cr);
+        const vs = vMap.get(i);
+        if (vs) for (const v of vs) drawVillager(f, v);
+      }
 
       if (dim) ctx.globalAlpha = 1;
     }
@@ -355,6 +463,17 @@ export function drawScene(f: Frame): void {
       const h = world.height[world.idx(ix, iy)];
       const c = cam.worldToScreen(rx - 0.5, ry - 0.5, h);
       drawArmy(f, c.x, c.y, a.color, a.size);
+    }
+    // ---- ticaret kervanları ----
+    for (const cv of sim.caravans.caravans) {
+      const ix = cv.x | 0, iy = cv.y | 0;
+      if (!world.inBounds(ix, iy)) continue;
+      if (sim.vis[world.idx(ix, iy)] === 0) continue;
+      const rx = cv.px + (cv.x - cv.px) * f.alpha;
+      const ry = cv.py + (cv.y - cv.py) * f.alpha;
+      const h = world.height[world.idx(ix, iy)];
+      const c = cam.worldToScreen(rx - 0.5, ry - 0.5, h);
+      drawCaravan(f, c.x, c.y, cv.kcolor);
     }
   }
 
@@ -383,5 +502,20 @@ export function drawScene(f: Frame): void {
     ctx.strokeStyle = '#d9a441';
     ctx.lineWidth = 2 * z;
     ctx.stroke();
+  }
+
+  // ---- atmosfer örtüleri: mevsim tonu + gündüz/gece ----
+  if (sim) {
+    const seasonTint = sim.currentSeason().tint;
+    if (seasonTint) {
+      ctx.fillStyle = seasonTint;
+      ctx.fillRect(0, 0, view.w, view.h);
+    }
+    const tint = dayTint(sim.time.t);
+    if (tint) {
+      const [r, g, b, a] = tint;
+      ctx.fillStyle = `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},${a})`;
+      ctx.fillRect(0, 0, view.w, view.h);
+    }
   }
 }

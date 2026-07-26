@@ -16,12 +16,36 @@ export interface SaveMeta {
   pop: number;
 }
 
-export function saveNow(sim: Sim): boolean {
+/** UI'ye ait, sim dışı kayıt ekleri (öğretici ilerlemesi vb.). */
+export interface UiExtras {
+  tut?: { step: number; done: boolean; hidden: boolean };
+}
+
+export function saveNow(sim: Sim, ui?: UiExtras): boolean {
   try {
-    localStorage.setItem(KEY, JSON.stringify(sim.serialize()));
+    const data = sim.serialize() as Record<string, unknown>;
+    if (ui) data.ui = ui;
+    localStorage.setItem(KEY, JSON.stringify(data));
     return true;
   } catch {
     return false; // depo dolu/kapalı — sessizce geç
+  }
+}
+
+/** Mevcut kaydı JSON metni olarak ver (dışa aktarma). */
+export function exportSave(): string | null {
+  try { return localStorage.getItem(KEY); } catch { return null; }
+}
+
+/** JSON metnini doğrulayıp kayıt olarak yükle (içe aktarma). */
+export function importSave(json: string): boolean {
+  try {
+    const d = JSON.parse(json) as RawSave;
+    if (d.v !== SAVE_VERSION || !d.world?.seed) return false;
+    localStorage.setItem(KEY, json);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -44,13 +68,13 @@ export function clearSave(): void {
 }
 
 /** Kayıttan dünya + sim'i geri kur. Bozuksa null. */
-export function restoreGame(): { world: World; sim: Sim } | null {
+export function restoreGame(): { world: World; sim: Sim; ui: UiExtras } | null {
   const d = loadRaw();
   if (!d) return null;
   try {
     const world = new World(d.world.W, d.world.H, d.world.seed);
     const sim = Sim.restore(world, d);
-    return { world, sim };
+    return { world, sim, ui: (d.ui as UiExtras) ?? {} };
   } catch {
     return null; // bozuk kayıt — yeni oyuna düş
   }
@@ -61,6 +85,7 @@ interface RawSave {
   world: { seed: number; W: number; H: number };
   time?: { year: number };
   player?: { pop: number };
+  ui?: unknown;
   [k: string]: unknown;
 }
 

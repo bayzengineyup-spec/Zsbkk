@@ -4,13 +4,35 @@
 > her oturum sonunda güncellenir. "Neredeydik, ne yaptık, sırada ne var?"
 
 ## 📍 Şu an
-- **Aşama:** **Faz 0 — M4 tamamlandı** (savaş, teknoloji, komutanlar, zafer).
-  Oyunun ÇEKİRDEK sistemleri modüler motorda tam çalışıyor. Sırada M5:
-  kalan prototip parite parçaları (aşağıda) → sonra **Faz 1: inşa süreleri**.
-- **Sürüm:** v0.6-M4 (modüler) · referans: `prototype/kralliklar-cagi-v0.5.html`.
+- **Aşama:** 🎉 **FAZ 0 TAMAMLANDI** (M5 ile). Prototipin tüm sistemleri
+  modüler, deterministik, testli motora taşındı. Sırada **Faz 1: İnşA
+  SÜRELERİ + ekonomi derinliği** (docs/03 — kullanıcının özel isteği).
+- **Sürüm:** v0.6 (Faz 0 final) · referans: `prototype/kralliklar-cagi-v0.5.html`.
 - **Son güncelleme:** 2026-07-26 (2. oturum).
+- **Bilinçli ertelenenler:** WebGL atlas (Canvas2D 60 fps veriyor; sprite
+  sayısı artınca), iskelet animasyonları + gerçek dokular (Faz 2), kayıt
+  slotları/IndexedDB/çevrimdışı ilerleme (Faz 3).
 
 ## ✅ Tamamlanan
+### Faz 0 · M5 — Atmosfer & Parite (2. oturum, devam)
+- **Yaban hayatı** (`core/wildlife.ts` + `data/species.ts`): 7 tür (geyik,
+  kurt sürüsü, ayı, domuz, tavşan + koyun/inek), biyoma göre dağılım,
+  dolaşma/kaçma/yırtıcı yaklaşması, tarla çevresinde çiftlik hayvanları.
+  **Bilinçli sapma:** prototipteki kamera-LOD'u determinizmi bozacağı için
+  kaldırıldı — tüm hayvanlar simüle ediliyor (≤140, ucuz).
+- **Ticaret kervanları** (`core/caravans.ts`): anlaşmalı krallıktan altın
+  taşır, savaştaki toprakta yağmalanabilir; haritada araba+flama görseli.
+- **Gündüz/gece** (`render/daynight.ts`): 4 dk'lık gün, şafak/akşam turuncusu,
+  gece mavisi; mevsim renk tonu; HUD'da vakit etiketi.
+- **Ses motoru** (`ui/sound.ts`): tamamen sentez (dosyasız) — 17 efekt +
+  ruh haline göre üretken müzik (barış/gece/savaş gamları, savaşta davul);
+  ses ayarları kalıcı.
+- **Öğretici** (`ui/tutorial.ts`): 9 adımlı hedef sistemi, ilerleme kayda
+  yazılıyor (kaldığın adımdan devam).
+- **Menü paneli:** ses aç/kapa + müzik/efekt sesi, kayıt dışa/içe aktarma
+  (JSON dosyası), yeni oyun.
+- **Testler: 71/71 yeşil** — yaban hayatı + kervan dahil kayıt roundtrip
+  determinizmi.
 ### Faz 0 · M4 — Savaş & İlerleme (2. oturum, devam)
 - **Askeri sistem** (`core/military.ts` + `data/units.ts`): 3 birim türü
   (taş-kağıt-makas + %65 karşıt bonusu), kışlada eğitim (kaynak+köylü),
@@ -103,21 +125,18 @@
 - Master plan yazıldı: `docs/00`…`docs/12` + bu DURUM dosyası.
 - Prototip repoya alındı (`prototype/`).
 
-## 🔜 Sıradaki adım (M5 — kalan prototip paritesi, sonra Faz 1)
-Çekirdek oynanış tamam. Prototipten henüz taşınmayan "atmosfer" parçaları:
-1. Ses motoru (Web Audio sentez — efekt + uyarlanabilir müzik).
-2. Gündüz/gece döngüsü + mevsim renk tonu (render).
-3. Yaban hayatı (hayvanlar + iskelet animasyonu) — Faz 2 ile birleşebilir.
-4. Öğretici (adım adım hedefler) + ayarlar paneli.
-5. Ticaret kervanları (görünür, yağmalanabilir) — market teknolojisiyle bağ.
-6. Kayıt slotları + dosya dışa/içe aktarma.
-Bunlar bitince **Faz 1: İnşa süreleri + üretim zincirleri** (docs/03) başlar.
-- Not: Görseller (karo + bina + köylü + ordu) bilinçli yer tutucu — **gerçek
-  dokular Faz 2'de her öğe için ayrı ayrı üretilecek** (kullanıcının açık talebi).
-- Not: WebGL atlas motoru henüz taşınmadı; Canvas2D sprite yolu 60 fps veriyor,
-  sprite sayısı artınca geçilecek.
-- Not: Kayıt şimdilik tek slot (localStorage). Slotlar + IndexedDB + çevrimdışı
-  ilerleme Faz 3'te (docs/10-KAYIT).
+## 🔜 Sıradaki adım — FAZ 1: İnşa Süreleri & Ekonomi (docs/03)
+Kullanıcının özel isteği: **"bir yer kurunca süre olmalı."**
+1. İnşa/yükseltme SÜRE sistemi: kur → "inşa halinde" → ilerleme çubuğu →
+   işçi sayısı süreyi kısaltır → bitince aktif. İptal = kısmi iade.
+2. Aşamalı inşa görseli (iskele → yarım → tam).
+3. İnşa kuyruğu (merkez seviyesi = eşzamanlı inşaat sınırı).
+4. Tüm binalara seviye/yükseltme (şimdilik yalnız meydan).
+5. Asker eğitimi de süreli kuyruğa geçer.
+6. İlk üretim zincirleri (un→ekmek, kereste) — çağ sistemine hazırlık.
+- Not: Görseller (karo + bina + köylü + ordu + hayvan) bilinçli yer tutucu —
+  **gerçek dokular Faz 2'de her öğe için ayrı ayrı üretilecek** (kullanıcının
+  açık talebi).
 
 ## 🧠 Karar günlüğü (neden böyle?)
 - **HTML prototipi temel alındı** çünkü gerçek WebGL grafik motoru ve canlı
@@ -134,6 +153,10 @@ Bunlar bitince **Faz 1: İnşa süreleri + üretim zincirleri** (docs/03) başla
 - Ekonomi zinciri kaç adım derin olacak.
 
 ## 📝 Oturum notları
+- **2026-07-26 (2e):** 🎉 FAZ 0 KAPANDI — M5: yaban hayatı, kervanlar,
+  gündüz/gece, sentez ses motoru + üretken müzik, 9 adımlı öğretici, menü
+  (ses/dışa-içe aktar). 71 test yeşil. Prototip paritesi (görseller hariç,
+  bilinçli) tamam.
 - **2026-07-26 (2d):** Faz 0 M4 bitti — askeri sistem (birimler, ordular,
   savaş, barbar/AI saldırıları), komutanlar, 16'lı teknoloji ağacı (tüm
   çarpanlar bağlı), zafer/yenilgi + son ekran. Restore referans hatası

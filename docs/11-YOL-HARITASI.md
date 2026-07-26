@@ -15,11 +15,13 @@ Amaç: prototipi modüler, test edilebilir projeye taşımak.
 - [x] RNG + Noise + World üretimini core'a taşı (deterministik testli, 18 test).
 - [x] Render çekirdeği: kamera + izometrik çizim + minimap. *(M1: Canvas2D sprite; WebGL atlas sprite sayısı artınca)*
 - [x] Dokunmatik input porta (atalet, pinch, çift dokunuş, uzun basma).
-- [ ] Ekonomi + köylü + olay + diplomasi + savaş çekirdeğini modüllere böl.
-      *(M2 ✓: ekonomi+köylü+mevsim, komut deseniyle · M3 ←: olaylar, krallıklar/diplomasi, sis, kayıt · M4: askeri, teknoloji, zafer)*
-- [ ] Veri dosyaları: buildings/units/techs/events ayrı veri modüllerine. *(biomes+buildings+seasons+names taşındı)*
+- [x] Ekonomi + köylü + olay + diplomasi + savaş çekirdeğini modüllere böl.
+      *(M2: ekonomi+köylü+mevsim · M3: olaylar, krallıklar/diplomasi, sis, kayıt · M4: askeri, teknoloji, komutanlar, zafer · M5: yaban hayatı, kervanlar, gündüz/gece, ses, öğretici)*
+- [x] Veri dosyaları: biomes/buildings/seasons/names/personalities/units/techs/species ayrı veri modüllerinde.
 - [x] Bilinen bug'lar: tekrarlı `#rail` butonları — yeni arayüzde yok.
-- **Bitti kriteri:** prototiple aynı oyun, artık modüler + testli çalışıyor.
+- **✅ FAZ 0 TAMAMLANDI** — prototiple sistem paritesi (görseller Faz 2'ye
+  bilinçli ertelendi: gerçek dokular her öğe için ayrı üretilecek; WebGL
+  atlas gerektiğinde). 71 test, determinizm + kayıt roundtrip kanıtlı.
 
 ## FAZ 1 — İnşa süreleri & ekonomi derinliği `[0.7]`
 - [ ] İnşa/yükseltme SÜRE sistemi (kuyruk, işçi, ilerleme, iptal) — bkz. 03.

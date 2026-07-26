@@ -224,6 +224,47 @@
   }
   .efx b { color: var(--ink); }
 
+  /* ---- öğretici kutusu ---- */
+  #tutbox {
+    position: fixed; left: 8px; top: 92px; z-index: 14;
+    background: rgba(26,20,16,0.93); border: 1px solid var(--gold-dim);
+    border-radius: 10px; padding: 8px 11px; max-width: 230px;
+    display: none; box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  }
+  #tutbox.show { display: block; }
+  .tuthead { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .tuthead .tic { font-size: 15px; }
+  .tuthead .ttl { font-size: 12.5px; color: var(--gold); font-weight: bold; }
+  .tuthead .tstep { margin-left: auto; font-size: 10px; color: var(--ink-dim); }
+  .tuthead .tclose {
+    background: none; border: none; color: var(--ink-dim); font-size: 13px;
+    cursor: pointer; padding: 2px 4px;
+  }
+  .tuttext { font-size: 11px; color: var(--ink-dim); line-height: 1.45; }
+
+  /* ---- menü paneli ---- */
+  #menupanel {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 74px; z-index: 19;
+    background: rgba(20,15,11,0.97); border: 1px solid var(--panel-edge);
+    border-radius: 12px; padding: 12px; display: none; min-width: 240px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+  }
+  #menupanel.show { display: block; }
+  #menupanel h3 {
+    font-size: 11px; color: var(--gold); text-transform: uppercase;
+    letter-spacing: 0.5px; margin: 0 2px 9px;
+  }
+  #menupanel .mrow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  #menupanel .mrow label { font-size: 11.5px; color: var(--ink-dim); min-width: 52px; }
+  #menupanel input[type=range] { flex: 1; accent-color: var(--gold); }
+  #menupanel button {
+    font-family: inherit; font-size: 12px; padding: 9px 12px; border-radius: 8px;
+    border: 1px solid var(--panel-edge); background: #241a10; color: var(--ink);
+    cursor: pointer; width: 100%; margin-bottom: 6px; text-align: left;
+  }
+  #menupanel button.danger { border-color: #5a2c20; color: #e0a090; }
+  #menupanel .mver { font-size: 9.5px; color: var(--ink-dim); text-align: center; margin-top: 2px; }
+
   /* ---- ipucu ---- */
   .hint {
     position: fixed; left: 50%; transform: translateX(-50%); bottom: 130px; z-index: 16;
@@ -321,6 +362,19 @@
 </div>
 
 <div id="efxbar"></div>
+<div id="tutbox"></div>
+
+<div id="menupanel">
+  <h3>Menü</h3>
+  <button id="m-sound">🔊 Ses: Açık</button>
+  <div class="mrow"><label>🎵 Müzik</label><input type="range" id="m-music" min="0" max="100"></div>
+  <div class="mrow"><label>🔔 Efekt</label><input type="range" id="m-sfx" min="0" max="100"></div>
+  <button id="m-export">💾 Kaydı Dışa Aktar</button>
+  <button id="m-import">📂 Kayıt Yükle (dosya)</button>
+  <button class="danger" id="m-new">🌍 Yeni Oyun</button>
+  <div class="mver">Krallıklar Çağı v0.6 · M5</div>
+</div>
+<input type="file" id="fileinput" accept="application/json,.json" style="display:none">
 
 <div id="placebar">
   <div class="pinfo"><b id="pb-name">—</b> · <span id="pb-status">yer seç</span></div>
@@ -337,7 +391,7 @@
   <div class="btn" id="b-diplo"><span class="ic">🤝</span>Diplomasi</div>
   <div class="btn" id="b-tech"><span class="ic">📜</span>Teknoloji</div>
   <div class="btn" id="b-center"><span class="ic">🎯</span>Merkez</div>
-  <div class="btn" id="b-new"><span class="ic">🌍</span>Yeni</div>
+  <div class="btn" id="b-menu"><span class="ic">☰</span>Menü</div>
 </div>
 
 <div id="boot">
