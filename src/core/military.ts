@@ -55,7 +55,12 @@ export interface Army {
   cmdId: number | null;
   /** oyuncu ordusunun taktik duruşu (eski kayıtlarda yok → dengeli) */
   tactic?: Tactic;
+  /** kalan meydan savaşı süresi (sn) — varışta başlar, bitince çözülür */
+  fighting?: number;
 }
+
+/** Meydan savaşı süresi (sn) — çarpışma haritada izlenir (Faz 4 M2). */
+export const BATTLE_TIME = 4;
 
 export interface Commander {
   id: number;
@@ -230,9 +235,11 @@ export class MilitarySystem {
     return true;
   }
 
-  /** Yürüyen oyuncu ordusunu geri çağır (Faz 4). */
+  /** Yürüyen oyuncu ordusunu geri çağır (Faz 4).
+      Çarpışma başladıysa artık dönüş yok — çekilmeyi taktik belirler. */
   recall(armyId: number): boolean {
-    const a = this.armies.find(x => x.id === armyId && x.owner === 'player' && !x.returning);
+    const a = this.armies.find(x =>
+      x.id === armyId && x.owner === 'player' && !x.returning && x.fighting === undefined);
     if (!a) return false;
     const c = this.host.villageCenter();
     a.returning = true;
@@ -372,8 +379,22 @@ export class MilitarySystem {
           this.armies.splice(ai, 1);
           continue;
         }
-        this.resolveBattle(a);
-        this.armies.splice(ai, 1);
+        // ---- meydan savaşı: varışta başlar, süre bitince çözülür ----
+        if (a.fighting === undefined) {
+          a.fighting = BATTLE_TIME;
+          if (a.owner === 'player') {
+            const k = typeof a.targetK === 'number' ? this.host.kingdoms.byId(a.targetK) : null;
+            this.host.toast(`⚔️ Ordun ${k ? k.name + ' önünde ' : ''}savaşa tutuştu!`);
+          } else {
+            this.host.toast('⚔️ Köyünün önünde savaş başladı!', 'bad');
+          }
+          continue;
+        }
+        a.fighting -= dt;
+        if (a.fighting <= 0) {
+          this.resolveBattle(a);
+          this.armies.splice(ai, 1);
+        }
       } else {
         a.x += (dx / dist) * Math.min(speed, dist);
         a.y += (dy / dist) * Math.min(speed, dist);

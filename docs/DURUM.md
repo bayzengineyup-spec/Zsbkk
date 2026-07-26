@@ -19,8 +19,11 @@
   **FAZ 4 · M1 TAMAM** (savaş derinliği): kısmi ordu gönderimi, taktik
   duruşlar (agresif/dengeli/temkinli+çekilme), geri çağırma, haritada
   ordu seçimi + canlı bilgi kartı. 101 test yeşil.
-  Sırada: Faz 4 M2 (savaş görselleştirme: çarpışma animasyonu, meydan
-  savaşı efektleri) veya PWA (ana ekrana ekle) — kullanıcıya göre.
+  **FAZ 4 · M2 de TAMAM:** meydan savaşları artık süreli (4sn) ve haritada
+  izleniyor — toz bulutu, çarpışan iki taraf, kıvılcımlar, çift sancak.
+  103 test yeşil.
+  Sırada: PWA (ana ekrana ekle + çevrimdışı açılış) veya Faz 4 M3
+  (kuşatma/savunma derinliği) — kullanıcıya göre.
 - **Sürüm:** v0.7 (Faz 2 M2) · referans: `prototype/kralliklar-cagi-v0.5.html`.
 - **Son güncelleme:** 2026-07-26 (2. oturum).
 - **Bilinçli ertelenenler:** WebGL atlas / chunk bake (Canvas2D ~42-56 fps
@@ -28,6 +31,21 @@
   ikon çizimleri (Faz 2 M3), kayıt slotları/IndexedDB/çevrimdışı (Faz 3).
 
 ## ✅ Tamamlanan
+### FAZ 4 · M2 — Savaş Görselleştirme (2. oturum)
+- **Süreli meydan savaşı:** ordu hedefe varınca savaş ANINDA çözülmez —
+  `Army.fighting = BATTLE_TIME (4sn)` başlar, süre bitince mevcut savaş
+  matematiği aynen çalışır. "⚔️ Ordun X önünde savaşa tutuştu!" bildirimi
+  + savaş sesi. Kayda girer (çarpışma ortasında kaydet-yükle roundtrip
+  determinizmi testli). Çarpışma sırasında geri çağırma kapalı (çekilmeyi
+  taktik belirler).
+- **Çarpışma sahnesi (drawBattle):** kabaran toz bulutu, hamle yapan
+  kollu-bacaklı iki taraf (saldıran/savunan renkleri), kısa ömürlü kılıç
+  kıvılcımları, iki dalgalanan sancak, "⚔ N" rozeti. Savunan rengi
+  hedeften türer (köy=altın, krallık=kendi rengi).
+- **Bilgi kartı:** çarpışan orduda "ÇARPIŞIYOR!" durumu, geri çağır gizli.
+- **Testler: 103/103** — varışta çözülmeme + ganimetin savaş sonuna
+  kalması + çarpışma ortası kayıt determinizmi. Tarayıcıda başkent önünde
+  savaş sahnesi doğrulandı; 56 fps, sıfır hata.
 ### FAZ 4 · M1 — Savaş Derinliği (2. oturum)
 - **Kısmi ordu gönderimi:** `attack` komutu artık `comp` (birim seçimi)
   ve `tactic` alır; eldekiyle sınırlanır, sıfır seçim reddedilir. Diplomasi

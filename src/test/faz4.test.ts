@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { World } from '../core/world';
 import { Sim } from '../core/sim';
+import { BATTLE_TIME } from '../core/military';
 import { compTotal } from '../data/units';
 import { completeAll, findLand } from './helpers';
 
@@ -128,6 +129,43 @@ describe('Faz 4 — savaş derinliği', () => {
       return JSON.stringify(s.snapshot());
     };
     expect(run()).toBe(run());
+  });
+
+  it('varışta savaş HEMEN çözülmez: meydan savaşı sürer, sonra sonuçlanır', () => {
+    const { s, kId } = warVillage(31);
+    s.player.units.spear = 8;
+    const goldBefore = s.player.res.gold;
+    s.applyCommand({ kind: 'attack', kingdomId: kId });
+    // varışa dek ilerlet
+    let guard = 0;
+    while (guard < 3000 && s.military.armies[0] && s.military.armies[0].fighting === undefined) {
+      s.tick(0.1); guard++;
+    }
+    const a = s.military.armies[0];
+    expect(a).toBeDefined();
+    expect(a.fighting).toBeGreaterThan(0);       // çarpışma sürüyor
+    expect(a.fighting).toBeLessThanOrEqual(BATTLE_TIME);
+    expect(s.player.res.gold).toBe(goldBefore);  // henüz ganimet yok
+    // çarpışma sırasında geri çağrılamaz
+    expect(s.applyCommand({ kind: 'recallArmy', armyId: a.id })).toBe(false);
+    settle(s);
+    expect(s.player.res.gold).toBeGreaterThan(goldBefore); // savaş çözüldü, ganimet geldi
+  });
+
+  it('çarpışmanın ORTASINDA kayıt: yükleyince aynı sonuca varır', () => {
+    const { s, kId } = warVillage(31);
+    s.player.units.spear = 8;
+    s.applyCommand({ kind: 'attack', kingdomId: kId });
+    let guard = 0;
+    while (guard < 3000 && s.military.armies[0] && s.military.armies[0].fighting === undefined) {
+      s.tick(0.1); guard++;
+    }
+    s.tick(0.1); // savaşın içinde biraz zaman
+    const saved = JSON.parse(JSON.stringify(s.serialize())) as Record<string, unknown>;
+    const s2 = Sim.restore(new World(64, 64, 31), saved);
+    expect(s2.military.armies[0].fighting).toBeCloseTo(s.military.armies[0].fighting!, 5);
+    settle(s); settle(s2);
+    expect(JSON.stringify(s.snapshot())).toBe(JSON.stringify(s2.snapshot()));
   });
 
   it('savaş ortasında kayıt: taktik ve geri çağırma durumu korunur', () => {

@@ -418,6 +418,85 @@ function drawSoldier(
   ctx.fillRect(sx - 1.75 * z, headY - 0.5 * z, 3.5 * z, 0.5 * z);
 }
 
+/** Meydan savaşı sahnesi: toz bulutu içinde çarpışan iki taraf,
+    kılıç kıvılcımları, iki sancak, sayı rozeti (Faz 4 M2). */
+function drawBattle(
+  f: Frame, sx: number, sy: number, atkColor: string, defColor: string, size: number,
+): void {
+  const { ctx } = f;
+  const z = f.cam.zoom;
+  const t = f.t;
+  const pulse = Math.sin(t * 7) * 0.5 + 0.5;
+
+  // toz bulutu (kabaran)
+  for (const [rx, ry, a0] of [[17, 6.5, 0.22], [12, 4.6, 0.18], [8, 3.2, 0.16]] as const) {
+    ctx.fillStyle = `rgba(126,100,64,${a0 + pulse * 0.05})`;
+    ctx.beginPath();
+    ctx.ellipse(sx + Math.sin(t * 2.4) * 1.2 * z, sy - 1 * z, (rx + pulse) * z, ry * z, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // çarpışan taraflar: soldan saldıran, sağdan savunan (hamle salınımlı)
+  for (let i = 0; i < 3; i++) {
+    const lunge = Math.max(0, Math.sin(t * 9 + i * 2.1)) * 1.8 * z;
+    drawSoldier(f, sx - (7.5 - i * 2.2) * z + lunge, sy + (i - 1) * 1.6 * z, i * 1.7, atkColor, i === 0);
+  }
+  for (let i = 0; i < 3; i++) {
+    const lunge = Math.max(0, Math.sin(t * 9 + 1.1 + i * 1.9)) * 1.8 * z;
+    drawSoldier(f, sx + (7.5 - i * 2.2) * z - lunge, sy + (i - 1) * 1.6 * z, 3 + i * 1.3, defColor, i === 1);
+  }
+
+  // kılıç kıvılcımları: kısa parlayan yıldızlar
+  for (let k = 0; k < 3; k++) {
+    const ph = (t * 2.4 + k * 0.37) % 1;
+    if (ph < 0.16) {
+      const fade = 1 - ph / 0.16;
+      const kx = sx + Math.sin(k * 5.7 + Math.floor(t * 2.4) * 3.1) * 4.5 * z;
+      const ky = sy - (5 + k * 2.4) * z;
+      const r = (1.6 + fade * 1.6) * z;
+      ctx.strokeStyle = `rgba(255,240,180,${0.5 + fade * 0.5})`;
+      ctx.lineWidth = 1 * z;
+      ctx.beginPath();
+      ctx.moveTo(kx - r, ky); ctx.lineTo(kx + r, ky);
+      ctx.moveTo(kx, ky - r); ctx.lineTo(kx, ky + r);
+      ctx.moveTo(kx - r * 0.6, ky - r * 0.6); ctx.lineTo(kx + r * 0.6, ky + r * 0.6);
+      ctx.stroke();
+    }
+  }
+
+  // iki sancak
+  for (const [side, color] of [[-1, atkColor], [1, defColor]] as const) {
+    const px = sx + side * 11 * z;
+    ctx.strokeStyle = '#2c241c';
+    ctx.lineWidth = 1.1 * z;
+    ctx.beginPath();
+    ctx.moveTo(px, sy - 2 * z);
+    ctx.lineTo(px, sy - 15 * z);
+    ctx.stroke();
+    const wv = Math.sin(t * 5 + side) * 0.7 * z;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(px, sy - 15 * z);
+    ctx.quadraticCurveTo(px + side * 3 * z, sy - 14.5 * z + wv, px + side * 5.5 * z, sy - 13.8 * z);
+    ctx.quadraticCurveTo(px + side * 3 * z, sy - 13 * z + wv, px, sy - 12 * z);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // çarpışma rozeti
+  ctx.font = `bold ${Math.max(10, 9 * z)}px Georgia, serif`;
+  const label = `⚔ ${size}`;
+  const tw = ctx.measureText(label).width;
+  ctx.fillStyle = 'rgba(12,8,5,0.82)';
+  ctx.beginPath();
+  ctx.roundRect(sx - tw / 2 - 4 * z, sy - 25 * z, tw + 8 * z, 11 * z, 3 * z);
+  ctx.fill();
+  ctx.fillStyle = '#f0e6d2';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, sx, sy - 19.5 * z);
+}
+
 /** Yürüyen ordu v2: kollu-bacaklı asker kümesi + sancak + sayı rozeti. */
 function drawArmy(f: Frame, sx: number, sy: number, color: string, size: number): void {
   const { ctx } = f;
@@ -1124,7 +1203,17 @@ export function drawScene(f: Frame): void {
         ctx.stroke();
         ctx.setLineDash([]);
       }
-      drawArmy(f, c.x, c.y, a.color, a.size);
+      if ((a.fighting ?? 0) > 0) {
+        // meydan savaşı: savunanın rengi hedeften
+        const defColor = a.targetK === 'player'
+          ? '#ffe9a8'
+          : (typeof a.targetK === 'number'
+              ? (sim.kingdoms.byId(a.targetK)?.color ?? '#9aa2ac')
+              : '#9aa2ac');
+        drawBattle(f, c.x, c.y, a.color, defColor, a.size);
+      } else {
+        drawArmy(f, c.x, c.y, a.color, a.size);
+      }
     }
     // ---- ticaret kervanları ----
     for (const cv of sim.caravans.caravans) {

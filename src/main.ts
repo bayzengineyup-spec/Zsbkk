@@ -143,20 +143,23 @@ function refreshArmyInfo(): void {
   if (!a) { hideInfo(); return; } // ordu vardı, savaş/dönüş bitti
   const act = el<HTMLElement>('ti-act');
   const T = TACTICS[a.tactic ?? 'dengeli'];
+  const fighting = (a.fighting ?? 0) > 0;
   const targetName = a.returning
     ? 'köye dönüyor'
     : (typeof a.targetK === 'number'
         ? (sim.kingdoms.byId(a.targetK)?.name ?? '—')
         : '—');
   const eta = Math.ceil(Math.hypot(a.tx - a.x, a.ty - a.y) / 3.5);
-  el('ti-name').textContent = `⚔️ Ordun · ${a.size} asker`;
+  el('ti-name').textContent = `⚔️ Ordun · ${a.size} asker${fighting ? ' · ÇARPIŞIYOR!' : ''}`;
   el('ti-l1').textContent = `Birlik: ${compLabel(a.comp)}`;
-  el('ti-l2').textContent = `Hedef: ${targetName} · ~${eta}sn`;
+  el('ti-l2').textContent = fighting
+    ? `⚔️ ${targetName} ile meydan savaşında!`
+    : `Hedef: ${targetName} · ~${eta}sn`;
   const cmd = a.cmdId !== null ? sim.military.commanders.find(c => c.id === a.cmdId) : null;
   el('ti-l3').textContent = `${T.icon} ${T.name}${cmd ? ` · ⭐${cmd.name} sv${cmd.level}` : ''}`;
   act.innerHTML = '';
   act.style.display = 'flex';
-  if (!a.returning) {
+  if (!a.returning && !fighting) {
     const rc = document.createElement('button');
     rc.textContent = '↩ Geri Çağır';
     rc.onclick = () => {
@@ -485,7 +488,7 @@ function sfxForToast(msg: string, kind: string): void {
   else if (msg.includes('öldü') || msg.includes('can aldı')) sfx('death');
   else if (msg.includes('altın') && kind === 'good') sfx('coin');
   else if (msg.includes('AKINI') || msg.includes('saldırı ordusu') || msg.includes('üzerine yürüyor')) sfx('horn');
-  else if (msg.includes('yenildi') || msg.includes('bozguna') || msg.includes('püskürttün') || msg.includes('Baskın')) sfx('battle');
+  else if (msg.includes('yenildi') || msg.includes('bozguna') || msg.includes('püskürttün') || msg.includes('Baskın') || msg.includes('savaşa tutuştu') || msg.includes('savaş başladı')) sfx('battle');
   else if (msg.includes('araştırıldı')) sfx('research');
   else if (msg.includes('seviye')) sfx('levelup');
   else if (kind === 'bad') sfx('error');
