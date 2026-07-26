@@ -470,3 +470,148 @@ export function buildTreeSprites(): TreeSprite[] {
   }
   return variants;
 }
+
+/* ============================================================
+   BÜYÜK ÖLÇEKLİ TON YAMALARI — karo sınırı tanımayan, dünya
+   uzayında sürekli çayır ton değişimi (kozmetik; dünya tohumundan
+   deterministik). Komşu karolar benzer değer alır → dikişsiz.
+   ============================================================ */
+import { makeNoise, fbm } from '../core/noise';
+import type { World } from '../core/world';
+
+export function buildTintMap(world: World): Float32Array {
+  const n = makeNoise((world.seed ^ 0x5eed) >>> 0);
+  const out = new Float32Array(world.W * world.H);
+  for (let y = 0; y < world.H; y++) {
+    for (let x = 0; x < world.W; x++) {
+      // iki ölçek: geniş çayır lekeleri + orta boy dalgalanma → -1..1
+      const v = fbm(n, x * 0.055, y * 0.055, 3, 2.1, 0.55);
+      out[y * world.W + x] = v * 2 - 1;
+    }
+  }
+  return out;
+}
+
+/* ============================================================
+   KAYNAK İKONLARI — renkli nokta yerine minik el çizimi işaretler.
+   ============================================================ */
+import type { ResourceKind } from '../data/biomes';
+
+export function buildResourceIcons(): Map<ResourceKind, TileSprite> {
+  const S = SPRITE_SCALE;
+  const out = new Map<ResourceKind, TileSprite>();
+  const W = 16, H = 14;
+
+  const make = (paint: (c: CanvasRenderingContext2D) => void): TileSprite => {
+    const cnv = document.createElement('canvas');
+    cnv.width = W * S; cnv.height = H * S;
+    const c = cnv.getContext('2d')!;
+    c.scale(S, S);
+    // yumuşak zemin gölgesi
+    c.fillStyle = 'rgba(0,0,0,0.2)';
+    c.beginPath(); c.ellipse(W / 2, H - 1.4, 5, 1.6, 0, 0, 7); c.fill();
+    paint(c);
+    return { cnv, w: W, h: H };
+  };
+
+  out.set('balık', make(c => {
+    c.fillStyle = '#4f9cc0';
+    c.beginPath(); c.ellipse(7.4, 8.6, 3.6, 2, -0.2, 0, 7); c.fill();
+    c.beginPath(); // kuyruk
+    c.moveTo(10.6, 8.2); c.lineTo(13, 6.6); c.lineTo(12.6, 9.8); c.closePath(); c.fill();
+    c.fillStyle = '#bcdcec';
+    c.beginPath(); c.ellipse(7, 9.3, 2.6, 0.9, -0.15, 0, 7); c.fill();
+    c.fillStyle = '#102830';
+    c.beginPath(); c.arc(5, 8, 0.5, 0, 7); c.fill();
+  }));
+  out.set('yiyecek', make(c => {
+    for (const [ox, tilt] of [[-2.4, -0.28], [0, 0], [2.4, 0.28]] as const) {
+      c.save();
+      c.translate(8 + ox, 12);
+      c.rotate(tilt);
+      c.strokeStyle = '#a8842c'; c.lineWidth = 0.7;
+      c.beginPath(); c.moveTo(0, 0); c.lineTo(0, -7); c.stroke();
+      c.fillStyle = '#d8b048';
+      for (let i = 0; i < 4; i++) {
+        c.beginPath(); c.ellipse(-0.9, -4.4 - i * 1.1, 0.8, 0.55, -0.5, 0, 7); c.fill();
+        c.beginPath(); c.ellipse(0.9, -4.4 - i * 1.1, 0.8, 0.55, 0.5, 0, 7); c.fill();
+      }
+      c.restore();
+    }
+  }));
+  out.set('at', make(c => {
+    // nal
+    c.strokeStyle = '#9aa2ac'; c.lineWidth = 1.7; c.lineCap = 'round';
+    c.beginPath(); c.arc(8, 8, 3.6, Math.PI * 0.85, Math.PI * 2.15); c.stroke();
+    c.fillStyle = '#5f676f';
+    for (const a of [0.95, 1.35, 1.65, 2.05]) {
+      c.beginPath(); c.arc(8 + Math.cos(a * Math.PI) * 3.6, 8 + Math.sin(a * Math.PI) * 3.6, 0.45, 0, 7); c.fill();
+    }
+  }));
+  out.set('odun', make(c => {
+    const log = (x: number, y: number) => {
+      c.fillStyle = '#6b4c28';
+      c.fillRect(x, y, 8.4, 2.6);
+      c.fillStyle = '#c8a468';
+      c.beginPath(); c.ellipse(x + 8.4, y + 1.3, 1, 1.3, 0, 0, 7); c.fill();
+      c.strokeStyle = '#8a6838'; c.lineWidth = 0.4;
+      c.beginPath(); c.arc(x + 8.4, y + 1.3, 0.55, 0, 7); c.stroke();
+      c.strokeStyle = 'rgba(30,18,8,0.5)'; c.lineWidth = 0.4;
+      c.beginPath(); c.moveTo(x + 0.5, y + 1.3); c.lineTo(x + 7.5, y + 1.3); c.stroke();
+    };
+    log(2.6, 9.4);
+    log(4.2, 6.6);
+  }));
+  out.set('altın', make(c => {
+    for (const [x, y, r] of [[6, 10, 1.7], [9.4, 10.4, 1.4], [7.8, 8, 1.5]] as const) {
+      const g = c.createRadialGradient(x - r * 0.4, y - r * 0.4, 0.2, x, y, r);
+      g.addColorStop(0, '#ffe27a');
+      g.addColorStop(1, '#b8860c');
+      c.fillStyle = g;
+      c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+    }
+    c.fillStyle = 'rgba(255,255,240,0.9)';
+    c.fillRect(6.7, 7.1, 0.7, 0.7);
+  }));
+  out.set('taş', make(c => {
+    for (const [x, y, r] of [[6.4, 10, 2.4], [10, 10.4, 1.9], [8, 7.6, 1.7]] as const) {
+      c.fillStyle = '#8a8578';
+      c.beginPath();
+      c.moveTo(x - r, y);
+      c.lineTo(x - r * 0.3, y - r);
+      c.lineTo(x + r * 0.7, y - r * 0.7);
+      c.lineTo(x + r, y + r * 0.4);
+      c.lineTo(x - r * 0.4, y + r * 0.5);
+      c.closePath(); c.fill();
+      c.fillStyle = 'rgba(255,255,255,0.2)';
+      c.beginPath();
+      c.moveTo(x - r * 0.3, y - r);
+      c.lineTo(x + r * 0.7, y - r * 0.7);
+      c.lineTo(x + r * 0.1, y - r * 0.2);
+      c.closePath(); c.fill();
+    }
+  }));
+  out.set('demir', make(c => {
+    c.fillStyle = '#6a7280';
+    c.beginPath();
+    c.moveTo(4, 10.6); c.lineTo(6, 6.8); c.lineTo(10.4, 6.2); c.lineTo(12, 9.4); c.lineTo(9.6, 11.4); c.lineTo(5.4, 11.6);
+    c.closePath(); c.fill();
+    c.fillStyle = '#9fb2c8';
+    c.beginPath();
+    c.moveTo(6, 6.8); c.lineTo(10.4, 6.2); c.lineTo(9, 8.4); c.closePath(); c.fill();
+    c.fillStyle = '#3f4650';
+    c.beginPath(); c.moveTo(9.6, 11.4); c.lineTo(12, 9.4); c.lineTo(10.6, 9); c.closePath(); c.fill();
+  }));
+  out.set('mermer', make(c => {
+    c.fillStyle = '#e8e8ee';
+    c.fillRect(4.4, 6.6, 7.2, 5.2);
+    c.fillStyle = '#c8c8d4';
+    c.fillRect(4.4, 10.2, 7.2, 1.6);
+    c.strokeStyle = 'rgba(120,130,150,0.5)'; c.lineWidth = 0.4;
+    c.beginPath();
+    c.moveTo(5, 7.4); c.quadraticCurveTo(8, 8.6, 11.2, 7.2);
+    c.moveTo(5.4, 9.4); c.quadraticCurveTo(7.6, 10.4, 11, 9.6);
+    c.stroke();
+  }));
+  return out;
+}

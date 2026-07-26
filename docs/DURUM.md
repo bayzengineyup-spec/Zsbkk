@@ -9,8 +9,11 @@
   canlı ayrıntılar (baca dumanı, dönen değirmen kanadı, dalgalanan
   bayraklar). Arazi kesintisiz zemin + biyom kenarı yumuşatma ile
   kullanıcının "blok blok" şikâyeti giderildi.
-  Sırada: Faz 2 M3 (çalışma animasyonları, kaynak ikonu çizimleri,
-  performans: chunk bake) veya Faz 3 (kayıt genişletme).
+  **M3 de tamam:** dünya uzayında sürekli ton yamaları (karo sınırı
+  tanımaz), 8 kaynak için el çizimi mini ikonlar, iş başındaki köylülerde
+  alet sallama animasyonu (balta/kazma/çapa).
+  Sırada: Faz 2 kapanışı için performans (chunk bake) değerlendirmesi
+  veya Faz 3 (kayıt genişletme: slotlar, IndexedDB, çevrimdışı ilerleme).
 - **Sürüm:** v0.7 (Faz 2 M2) · referans: `prototype/kralliklar-cagi-v0.5.html`.
 - **Son güncelleme:** 2026-07-26 (2. oturum).
 - **Bilinçli ertelenenler:** WebGL atlas / chunk bake (Canvas2D ~42-56 fps
@@ -18,6 +21,21 @@
   ikon çizimleri (Faz 2 M3), kayıt slotları/IndexedDB/çevrimdışı (Faz 3).
 
 ## ✅ Tamamlanan
+### FAZ 2 · M3 — Boyamsı Zemin + İkonlar + Çalışma Pozları (2. oturum, devam)
+- **Büyük ton yamaları (`buildTintMap`):** dünya tohumundan üretilen
+  sürekli fbm gürültüsü karo başına -1..1 değer verir; çayır ailesi
+  biyomlarda sıcak (saman) / serin (koyu yeşil) çok hafif örtü çizilir.
+  Komşu karolar benzer değer aldığı için yamalar KARO SINIRI TANIMAZ —
+  kalan karo hissini eritir. Tamamen kozmetik, sim'e girmez.
+- **Kaynak ikonları (`buildResourceIcons`):** renkli nokta yerine minik
+  el çizimi işaretler — balık, buğday demeti, nal (at), tomruk yığını,
+  altın külçeleri, taş yığını, demir cevheri, mermer blok. Gölgeli,
+  bake edilmiş, yakınlaşınca görünür.
+- **Köylü çalışma pozları:** iş yerinin başında duran köylü aletini
+  sallar — oduncu/bıçkıhane baltayla, taş ocağı/maden kazmayla, tarla
+  çapayla. Omuzdan dönen kol + alet başı; köylü kimliğinden faz kayması
+  (herkes aynı anda sallamaz).
+- 88/88 test yeşil; duman testi 48 fps, sıfır hata.
 ### FAZ 2 · M2 — Dünya Nesneleri v2 + Canlı Ayrıntılar (2. oturum, devam)
 - **Kesintisiz zemin (kullanıcı geri bildirimi):** facet degradesi + kenar
   çizgisi kaldırıldı, 12 ince gölge kademesi, biyom paleti uyumlandı,

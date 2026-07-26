@@ -29,9 +29,14 @@ export interface Ghost {
   valid: boolean;
 }
 
-const RES_COLORS: Record<ResourceKind, string> = {
-  'balık': '#5ec8e8', 'yiyecek': '#a8e05f', 'at': '#d9b38c', 'odun': '#8a5a2a',
-  'altın': '#ffd700', 'taş': '#b0a89a', 'demir': '#c0c8d0', 'mermer': '#f0f0f5',
+/* büyük ton yamalarının uygulandığı "çayır ailesi" biyomları */
+const GRASSY = new Set<string>(['grass', 'savanna', 'forest', 'taiga', 'swamp']);
+
+/* iş yeri → köylünün salladığı alet */
+const WORK_TOOLS: Partial<Record<BuildingType, 'axe' | 'pick' | 'hoe'>> = {
+  woodcutter: 'axe', lumbermill: 'axe',
+  quarry: 'pick', mine: 'pick',
+  farm: 'hoe',
 };
 
 /* köylü görünümü: isimden deterministik renk (aynı köylü hep aynı) */
@@ -67,6 +72,9 @@ export interface Frame {
   bSprites: Map<BuildingType, BuildingSprite>;
   treeSprites: TreeSprite[];
   capSprite: BuildingSprite;
+  /** dünya uzayında sürekli çayır ton haritası (-1..1, kozmetik) */
+  tintMap: Float32Array | null;
+  resIcons: Map<ResourceKind, TileSprite>;
   sim: Sim | null;
   sel: TileSel | null;
   ghost: Ghost | null;
@@ -528,8 +536,9 @@ function drawMillBlades(f: Frame, hubX: number, hubY: number): void {
   ctx.beginPath(); ctx.arc(hubX, hubY, 1.6 * K * z, 0, Math.PI * 2); ctx.fill();
 }
 
-/** Köylü: kollu-bacaklı yürüyen insan (onaylanan stil — mockup2 person()). */
-function drawVillager(f: Frame, v: Villager): void {
+/** Köylü: kollu-bacaklı yürüyen insan (onaylanan stil — mockup2 person()).
+    İş yerinin başında duruyorsa aletini sallar (odun kesme/çapa/kazma). */
+function drawVillager(f: Frame, v: Villager, work?: BuildingType): void {
   const { ctx, cam, world } = f;
   const z = cam.zoom;
   // interpolasyonlu konum
@@ -589,21 +598,80 @@ function drawVillager(f: Frame, v: Villager): void {
   ctx.fillStyle = '#332412';
   ctx.fillRect(c.x - 2.1 * z, hipY - 0.9 * z, 4.2 * z, 0.9 * z);
 
-  // kollar (bacaklarla zıt salınım)
-  ctx.strokeStyle = shade(tunic, 0.78);
-  ctx.lineWidth = 1.2 * z;
-  ctx.beginPath();
-  ctx.moveTo(c.x - 1.8 * z, shoulderY + 0.8 * z);
-  ctx.lineTo(c.x - 2.3 * z - walk * 1.6 * z, hipY - 0.4 * z);
-  ctx.moveTo(c.x + 1.8 * z, shoulderY + 0.8 * z);
-  ctx.lineTo(c.x + 2.3 * z + walk * 1.6 * z, hipY - 0.4 * z);
-  ctx.stroke();
-  // eller (ten)
-  ctx.fillStyle = '#e0b88c';
-  ctx.beginPath();
-  ctx.arc(c.x - 2.3 * z - walk * 1.6 * z, hipY - 0.2 * z, 0.65 * z, 0, Math.PI * 2);
-  ctx.arc(c.x + 2.3 * z + walk * 1.6 * z, hipY - 0.2 * z, 0.65 * z, 0, Math.PI * 2);
-  ctx.fill();
+  const tool = work ? WORK_TOOLS[work] : undefined;
+  const working = !!tool && !moving;
+  if (working) {
+    // sol kol sarkık
+    ctx.strokeStyle = shade(tunic, 0.78);
+    ctx.lineWidth = 1.2 * z;
+    ctx.beginPath();
+    ctx.moveTo(c.x - 1.8 * z, shoulderY + 0.8 * z);
+    ctx.lineTo(c.x - 2.1 * z, hipY - 0.2 * z);
+    ctx.stroke();
+    // alet kolu: omuzdan vuruş salınımı (yukarı kalk → öne in)
+    const swing = Math.sin(f.t * 6 + v.id * 1.3);
+    const ang = -0.35 - (swing * 0.5 + 0.5) * 1.15;
+    const shX = c.x + 1.6 * z, shY = shoulderY + 0.8 * z;
+    const armL = 2.6 * z;
+    const hx2 = shX + Math.cos(ang) * armL, hy2 = shY + Math.sin(ang) * armL;
+    ctx.beginPath();
+    ctx.moveTo(shX, shY);
+    ctx.lineTo(hx2, hy2);
+    ctx.stroke();
+    // alet sapı
+    const tL = 3.4 * z;
+    const tx2 = hx2 + Math.cos(ang) * tL, ty2 = hy2 + Math.sin(ang) * tL;
+    ctx.strokeStyle = '#8a6a3a';
+    ctx.lineWidth = 0.8 * z;
+    ctx.beginPath();
+    ctx.moveTo(hx2, hy2);
+    ctx.lineTo(tx2, ty2);
+    ctx.stroke();
+    // alet başı
+    if (tool === 'axe') {
+      ctx.fillStyle = '#9aa0a8';
+      ctx.beginPath();
+      ctx.moveTo(tx2, ty2);
+      ctx.lineTo(tx2 + Math.cos(ang + 1.4) * 1.9 * z, ty2 + Math.sin(ang + 1.4) * 1.9 * z);
+      ctx.lineTo(tx2 + Math.cos(ang + 0.7) * 2.4 * z, ty2 + Math.sin(ang + 0.7) * 2.4 * z);
+      ctx.closePath();
+      ctx.fill();
+    } else if (tool === 'pick') {
+      ctx.strokeStyle = '#7c828a';
+      ctx.lineWidth = 0.9 * z;
+      ctx.beginPath();
+      ctx.arc(tx2, ty2, 1.7 * z, ang + 0.6, ang + 2.5);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = '#6b6f75';
+      ctx.save();
+      ctx.translate(tx2, ty2);
+      ctx.rotate(ang + 1.2);
+      ctx.fillRect(-0.5 * z, 0, 1 * z, 2 * z);
+      ctx.restore();
+    }
+    // el
+    ctx.fillStyle = '#e0b88c';
+    ctx.beginPath();
+    ctx.arc(hx2, hy2, 0.65 * z, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // kollar (bacaklarla zıt salınım)
+    ctx.strokeStyle = shade(tunic, 0.78);
+    ctx.lineWidth = 1.2 * z;
+    ctx.beginPath();
+    ctx.moveTo(c.x - 1.8 * z, shoulderY + 0.8 * z);
+    ctx.lineTo(c.x - 2.3 * z - walk * 1.6 * z, hipY - 0.4 * z);
+    ctx.moveTo(c.x + 1.8 * z, shoulderY + 0.8 * z);
+    ctx.lineTo(c.x + 2.3 * z + walk * 1.6 * z, hipY - 0.4 * z);
+    ctx.stroke();
+    // eller (ten)
+    ctx.fillStyle = '#e0b88c';
+    ctx.beginPath();
+    ctx.arc(c.x - 2.3 * z - walk * 1.6 * z, hipY - 0.2 * z, 0.65 * z, 0, Math.PI * 2);
+    ctx.arc(c.x + 2.3 * z + walk * 1.6 * z, hipY - 0.2 * z, 0.65 * z, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // kafa + saç
   const headY = shoulderY - 2.2 * z;
@@ -799,6 +867,21 @@ export function drawScene(f: Frame): void {
           ctx.drawImage(det.cnv, c.x - halfWz - 0.75, c.y - halfHz - 0.75, det.w * z + 1.5, det.h * z + 1.5);
         }
       }
+
+      // büyük ölçekli çayır ton yamaları: karo sınırı TANIMAZ (dünya
+      // uzayında sürekli gürültü) → kalan karo hissini eritir
+      if (f.tintMap && GRASSY.has(biome)) {
+        const tv = f.tintMap[i];
+        if (tv > 0.08) {
+          diamondPath(ctx, c.x, c.y, halfWz + 1, halfHz + 1);
+          ctx.fillStyle = `rgba(198,182,86,${Math.min(0.12, (tv - 0.08) * 0.34)})`;
+          ctx.fill();
+        } else if (tv < -0.08) {
+          diamondPath(ctx, c.x, c.y, halfWz + 1, halfHz + 1);
+          ctx.fillStyle = `rgba(14,50,24,${Math.min(0.13, (-tv - 0.08) * 0.34)})`;
+          ctx.fill();
+        }
+      }
       drawn++;
 
       // krallık toprağı tonu
@@ -812,16 +895,19 @@ export function drawScene(f: Frame): void {
         ctx.globalAlpha = oldA;
       }
 
-      // kaynak işareti (yakınlaşınca, bina yoksa)
+      // kaynak işareti: minik el çizimi ikon (yakınlaşınca, bina yoksa)
       const res = world.res[i];
       if (res !== null && z >= 1.1 && !bMap.has(i)) {
-        ctx.fillStyle = RES_COLORS[res];
-        ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-        ctx.lineWidth = z;
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, 3.2 * z, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        const icon = f.resIcons.get(res);
+        if (icon) {
+          ctx.drawImage(
+            icon.cnv,
+            c.x - (icon.w / 2) * z,
+            c.y - (icon.h - 2.5) * z,
+            icon.w * z,
+            icon.h * z,
+          );
+        }
       }
 
       // ağaçlar: orman/iğne orman karolarına deterministik dikim
@@ -894,7 +980,12 @@ export function drawScene(f: Frame): void {
         const cs = cMap.get(i);
         if (cs) for (const cr of cs) drawCreature(f, cr);
         const vs = vMap.get(i);
-        if (vs) for (const v of vs) drawVillager(f, v);
+        if (vs) {
+          for (const v of vs) {
+            const jb = v.job ? bMap.get(world.idx(v.job.bx, v.job.by)) : undefined;
+            drawVillager(f, v, jb?.type);
+          }
+        }
       }
 
       if (dim) ctx.globalAlpha = 1;

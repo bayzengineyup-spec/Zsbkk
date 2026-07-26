@@ -8,7 +8,7 @@ import { Sim } from './core/sim';
 import { BIOMES } from './data/biomes';
 import { BUILDINGS, costStr, upgradeCost, upgradeTime, type BuildingType } from './data/buildings';
 import { Camera, type Viewport } from './render/camera';
-import { buildTileSprites, buildTreeSprites } from './render/tiles';
+import { buildTileSprites, buildTreeSprites, buildTintMap, buildResourceIcons } from './render/tiles';
 import { buildBuildingSprites, buildCapitalSprite } from './render/buildings';
 import { drawScene, type Frame, type Ghost, type RenderStats, type TileSel } from './render/scene';
 import { MiniMap } from './render/minimap';
@@ -69,6 +69,8 @@ const bSpritesNight = buildBuildingSprites(true); // pencereler ışıklı
 const capDay = buildCapitalSprite(false);
 const capNight = buildCapitalSprite(true);
 const treeSprites = buildTreeSprites();
+const resIcons = buildResourceIcons();
+let tintMap: Float32Array | null = null; // dünya kurulunca üretilir
 let world: World | null = null;
 let sim: Sim | null = null;
 // geliştirici konsolu için salt-okunur erişim (duman testleri de kullanır)
@@ -589,6 +591,7 @@ el<HTMLButtonElement>('end-again').onclick = () => {
 // ---------- dünya kurulumu ----------
 function finishSetup(focusX: number, focusY: number): void {
   if (!world || !sim) return;
+  tintMap = buildTintMap(world); // kozmetik çayır ton yamaları
   minimap = new MiniMap(world);
   sel = null; ghost = null;
   hideInfo();
@@ -707,6 +710,7 @@ function loop(t: number): void {
       bSprites: night ? bSpritesNight : bSpritesDay,
       treeSprites,
       capSprite: night ? capNight : capDay,
+      tintMap, resIcons,
       sim, sel, ghost, alpha, t: renderT, stats,
     };
     drawScene(frame);
