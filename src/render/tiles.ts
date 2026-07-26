@@ -10,7 +10,11 @@ import { painter, shade } from './paint';
 
 export const SPRITE_SCALE = 2;
 export const SKIRT = 26;
-export const SHADE_STEPS = 6;
+/* Çok kademe + dar parlaklık aralığı: komşu karolar arasında görünür
+   basamak kalmaz, zemin kesintisiz tek yüzey gibi okunur. */
+export const SHADE_STEPS = 12;
+/* Karo başına detay deseni varyant sayısı (tekrar ızgarasını kırar). */
+export const DETAIL_VARIANTS = 3;
 
 export interface TileSprite {
   cnv: HTMLCanvasElement;
@@ -46,7 +50,7 @@ export function buildTileSprites(): Map<string, TileSprite> {
     const def = BIOMES[id];
     for (let bucket = 0; bucket < SHADE_STEPS; bucket++) {
       const { rng, R } = painter(1000 + bi * 37 + bucket);
-      const mult = 0.88 + (bucket / (SHADE_STEPS - 1)) * 0.24;
+      const mult = 0.93 + (bucket / (SHADE_STEPS - 1)) * 0.12;
       const cnv = document.createElement('canvas');
       cnv.width = w; cnv.height = fullH;
       const c = cnv.getContext('2d')!;
@@ -61,17 +65,17 @@ export function buildTileSprites(): Map<string, TileSprite> {
         c.closePath();
       };
 
-      // ---- etek (yan yüzler) ----
-      c.fillStyle = shade(def.side, mult * 0.82);
+      // ---- etek (yan yüzler) — düşük kontrast: basamak hissini büyütmesin ----
+      c.fillStyle = shade(def.side, mult * 0.92);
       c.beginPath();
       c.moveTo(0, midY); c.lineTo(midX, topH); c.lineTo(midX, fullH); c.lineTo(0, midY + SKIRT * S);
       c.closePath(); c.fill();
-      c.fillStyle = shade(def.side, mult * 1.0);
+      c.fillStyle = shade(def.side, mult * 1.02);
       c.beginPath();
       c.moveTo(w, midY); c.lineTo(midX, topH); c.lineTo(midX, fullH); c.lineTo(w, midY + SKIRT * S);
       c.closePath(); c.fill();
-      // etek katman çizgileri (toprak/taş hissi)
-      c.strokeStyle = 'rgba(0,0,0,0.14)';
+      // etek katman çizgileri (çok hafif)
+      c.strokeStyle = 'rgba(0,0,0,0.06)';
       c.lineWidth = S * 0.7;
       for (let i = 1; i <= 3; i++) {
         const oy = (SKIRT * S * i) / 4;
@@ -81,15 +85,35 @@ export function buildTileSprites(): Map<string, TileSprite> {
         c.stroke();
       }
 
-      // ---- üst yüzey: dikey degrade taban ----
-      const g = c.createLinearGradient(0, 0, 0, topH);
-      g.addColorStop(0, shade(def.top, mult * 1.06));
-      g.addColorStop(1, shade(def.top, mult * 0.9));
+      // ---- üst yüzey: DÜZ taban rengi ----
+      // (karo başına degrade her elması ayrı "facet" gibi gösteriyordu —
+      //  kullanıcı geri bildirimi: zemin tek parça yüzey gibi okunmalı)
       diamondPath();
-      c.fillStyle = g;
+      c.fillStyle = shade(def.top, mult);
       c.fill();
 
-      // ---- biyoma özel detay (kırpılmış) ----
+      out.set(`${id}:${bucket}`, { cnv, w: TILE_W, h: TILE_H + SKIRT });
+    }
+
+    /* ---- detay katmanı: biyom × varyant (saydam, kovadan bağımsız) ----
+       Her karo konumundan türeyen varyantı kullanır → aynı desenin her
+       karoda tekrarlanmasından doğan ızgara görünümü kırılır. */
+    for (let v = 0; v < DETAIL_VARIANTS; v++) {
+      const { rng, R } = painter(2000 + bi * 53 + v * 7);
+      const mult = 1;
+      const cnv = document.createElement('canvas');
+      cnv.width = w; cnv.height = topH;
+      const c = cnv.getContext('2d')!;
+      const midX = w / 2, midY = topH / 2;
+      const diamondPath = () => {
+        c.beginPath();
+        c.moveTo(midX, 0);
+        c.lineTo(w, midY);
+        c.lineTo(midX, topH);
+        c.lineTo(0, midY);
+        c.closePath();
+      };
+
       c.save();
       diamondPath();
       c.clip();
@@ -98,19 +122,19 @@ export function buildTileSprites(): Map<string, TileSprite> {
       const isGrass = id === 'grass' || id === 'savanna' || id === 'forest'
         || id === 'taiga' || id === 'swamp';
       const isWaterB = id === 'water' || id === 'deep_water';
-      const isRock = id === 'rock' || id === 'mountain' || id === 'volcanic' || id === 'tundra';
+      const isRock = id === 'rock' || id === 'mountain' || id === 'volcanic';
       const isSand = id === 'beach' || id === 'shore' || id === 'desert';
       const isSnow = id === 'snow' || id === 'peak';
 
       if (isGrass) {
-        // ton yamaları
-        for (let i = 0; i < 7; i++) {
+        // ton yamaları (çok hafif — karo sınırında fark yaratmasın)
+        for (let i = 0; i < 6; i++) {
           const [px, py] = inDiamond(R);
-          const r = R(8, 22) * S;
+          const r = R(10, 24) * S;
           const pg = c.createRadialGradient(px * S, py * S, 1, px * S, py * S, r);
-          pg.addColorStop(0, shade(def.top, mult * R(0.85, 1.15)));
+          pg.addColorStop(0, shade(def.top, mult * R(0.95, 1.05)));
           pg.addColorStop(1, 'rgba(0,0,0,0)');
-          c.globalAlpha = 0.5;
+          c.globalAlpha = 0.3;
           c.fillStyle = pg;
           c.fillRect(px * S - r, py * S - r, r * 2, r * 2);
           c.globalAlpha = 1;
@@ -119,7 +143,7 @@ export function buildTileSprites(): Map<string, TileSprite> {
         const blades = id === 'swamp' ? 60 : 90;
         for (let i = 0; i < blades; i++) {
           const [px, py] = inDiamond(R);
-          const tone = R(0.7, 1.3);
+          const tone = R(0.84, 1.18);
           c.strokeStyle = shade(def.top, mult * tone);
           c.lineWidth = R(0.7, 1.4) * S;
           const hh = R(2.5, 6) * S, sway = R(-2, 2) * S;
@@ -224,6 +248,28 @@ export function buildTileSprites(): Map<string, TileSprite> {
             c.beginPath(); c.ellipse(px * S, py * S, R(2, 5) * S, R(0.8, 1.6) * S, R(0, 3), 0, 7); c.fill();
           }
         }
+      } else if (id === 'tundra') {
+        // donmuş bozkır: seyrek soluk ot öbekleri + birkaç çakıl + kırağı
+        for (let i = 0; i < 7; i++) {
+          const [px, py] = inDiamond(R);
+          c.strokeStyle = `rgba(150,140,110,${R(0.25, 0.5)})`;
+          c.lineWidth = R(0.7, 1.2) * S;
+          const hh = R(2, 4) * S;
+          c.beginPath();
+          c.moveTo(px * S, py * S);
+          c.lineTo(px * S + R(-1.5, 1.5) * S, py * S - hh);
+          c.stroke();
+        }
+        for (let i = 0; i < 3; i++) {
+          const [px, py] = inDiamond(R);
+          c.fillStyle = shade(def.top, mult * R(0.8, 0.92));
+          c.beginPath(); c.ellipse(px * S, py * S, R(1, 2.4) * S, R(0.8, 1.6) * S, R(0, 3), 0, 7); c.fill();
+        }
+        for (let i = 0; i < 8; i++) {
+          const [px, py] = inDiamond(R);
+          c.fillStyle = `rgba(235,242,248,${R(0.12, 0.3)})`;
+          c.fillRect(px * S, py * S, S, S);
+        }
       } else if (isSnow) {
         // kar ışıltısı + mavi gölge oyukları
         for (let i = 0; i < 8; i++) {
@@ -238,14 +284,10 @@ export function buildTileSprites(): Map<string, TileSprite> {
         }
       }
       c.restore();
+      // NOT: karo kenar çizgisi bilinçli olarak YOK — her elması ayrı ayrı
+      // gösteriyordu; zemin kesintisiz yüzey gibi okunmalı.
 
-      // kenar: çok hafif iç gölge (karo ayrımı doğal kalsın)
-      diamondPath();
-      c.strokeStyle = 'rgba(0,0,0,0.08)';
-      c.lineWidth = S * 0.6;
-      c.stroke();
-
-      out.set(`${id}:${bucket}`, { cnv, w: TILE_W, h: TILE_H + SKIRT });
+      out.set(`${id}:d${v}`, { cnv, w: TILE_W, h: TILE_H });
     }
   }
   return out;

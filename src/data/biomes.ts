@@ -31,12 +31,15 @@ export const BIOMES: Record<BiomeId, BiomeDef> = {
   water:      { name: 'Deniz',       top: '#2166a0', side: '#164a78', res: 'balık',  water: true },
   shore:      { name: 'Sahil',       top: '#d9c48a', side: '#b09a5f', res: 'balık' },
   beach:      { name: 'Kumsal',      top: '#e8d49a', side: '#c2ab6d', res: null },
-  grass:      { name: 'Çayır',       top: '#6aa84f', side: '#4c7d38', res: 'yiyecek' },
-  savanna:    { name: 'Savan',       top: '#a7a13b', side: '#7d7826', res: 'at' },
-  forest:     { name: 'Orman',       top: '#3d7a3a', side: '#295327', res: 'odun' },
-  taiga:      { name: 'İğne Orman',  top: '#3f6b52', side: '#2b4b39', res: 'odun' },
+  /* Kara biyomları birbirine yakın tonlarda tutulur: karo sınırlarında
+     sert renk elmasları oluşmasın, zemin tek yüzey gibi aksın. Orman
+     ağaçlarla, savan sıcak tonla ayırt edilir. */
+  grass:      { name: 'Çayır',       top: '#6aa84f', side: '#548540', res: 'yiyecek' },
+  savanna:    { name: 'Savan',       top: '#8ba248', side: '#6f823a', res: 'at' },
+  forest:     { name: 'Orman',       top: '#569447', side: '#457839', res: 'odun' },
+  taiga:      { name: 'İğne Orman',  top: '#578a58', side: '#467047', res: 'odun' },
   desert:     { name: 'Çöl',         top: '#e0c064', side: '#b59a45', res: 'altın' },
-  swamp:      { name: 'Bataklık',    top: '#5e6b34', side: '#3f4a22', res: 'odun' },
+  swamp:      { name: 'Bataklık',    top: '#68793f', side: '#536233', res: 'odun' },
   tundra:     { name: 'Tundra',      top: '#b8c0c2', side: '#8f989a', res: 'taş' },
   snow:       { name: 'Kar',         top: '#e8eef0', side: '#c0c9cc', res: null },
   rock:       { name: 'Kayalık',     top: '#8a8175', side: '#63594f', res: 'taş' },

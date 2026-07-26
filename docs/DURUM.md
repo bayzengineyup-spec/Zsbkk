@@ -222,6 +222,16 @@ Kalanlar, aynı stil ve `paint.ts` yardımcılarıyla:
 - Ekonomi zinciri kaç adım derin olacak.
 
 ## 📝 Oturum notları
+- **2026-07-26 (2i):** Kullanıcı geri bildirimi düzeltmesi — "arazi blok blok
+  görünüyor, konseptteki gibi kesintisiz zemin olmalı; evler biraz büyüsün":
+  karo başına facet degradesi ve kenar çizgisi kaldırıldı, gölge 12 ince
+  kademeye yumuşatıldı, etek kontrastı düşürüldü, kara biyom renkleri
+  uyumlandı (orman artık rengiyle değil ağaçlarıyla ayırt ediliyor),
+  detay katmanı tabandan ayrılıp karo başına 3 varyanttan deterministik
+  seçilir oldu (tekrar ızgarası kırıldı), tundraya özel seyrek doku,
+  binalar %28 büyütüldü (K=1.28). 88 test yeşil, sıfır hata; headless fps
+  56→42 (yazılım render'ı; cihazda GPU var — gerekirse Faz 2'de bölge
+  önbelleği/chunk bake optimizasyonu yapılacak).
 - **2026-07-26 (2h):** FAZ 2 M1 — onaylanan gerçekçi stil motora işlendi:
   paint.ts yardımcıları, v2 karolar+ağaçlar+binalar (gündüz/gece setleri),
   kollu-bacaklı köylüler, parşömen/ahşap/madalyon arayüz (ui/theme.ts).

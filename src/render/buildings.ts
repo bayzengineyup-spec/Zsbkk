@@ -536,7 +536,9 @@ export function buildBuildingSprites(night: boolean): Map<BuildingType, Building
 
     d.paint(c, rng, R, W2, H2, base, night);
 
-    out.set(type, { cnv, w: d.w, h: d.h, anchorY: d.h - 6 });
+    // K: dünyada görünen boyut çarpanı (kullanıcı isteği: binalar daha iri)
+    const K = 1.28;
+    out.set(type, { cnv, w: d.w * K, h: d.h * K, anchorY: (d.h - 6) * K });
   }
   return out;
 }

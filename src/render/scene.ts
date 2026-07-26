@@ -13,7 +13,7 @@ import type { BuildingType } from '../data/buildings';
 import type { ResourceKind } from '../data/biomes';
 import { SPECIES } from '../data/species';
 import { Camera, TILE_W, TILE_H, type Viewport } from './camera';
-import { shadeBucket, type TileSprite, type TreeSprite } from './tiles';
+import { shadeBucket, DETAIL_VARIANTS, type TileSprite, type TreeSprite } from './tiles';
 import type { BuildingSprite } from './buildings';
 import { dayTint } from './daynight';
 import { shade } from './paint';
@@ -520,7 +520,8 @@ export function drawScene(f: Frame): void {
       const visLevel = sim ? sim.vis[i] : 2;
       if (visLevel === 0) continue;
       const h = world.height[i];
-      const spr = f.tileSprites.get(`${world.tiles[i]}:${shadeBucket(h)}`);
+      const biome = world.tiles[i];
+      const spr = f.tileSprites.get(`${biome}:${shadeBucket(h)}`);
       if (!spr) continue;
       const c = cam.worldToScreen(gx, gy, h);
       if (c.x < -TILE_W * z || c.x > view.w + TILE_W * z) continue;
@@ -529,6 +530,14 @@ export function drawScene(f: Frame): void {
       if (dim) ctx.globalAlpha = 0.5; // keşfedilmiş ama görüş dışı: loş
       // 0.75px taşma: kesirli konumlarda sprite dikişlerini örter
       ctx.drawImage(spr.cnv, c.x - halfWz - 0.75, c.y - halfHz - 0.75, spr.w * z + 1.5, spr.h * z + 1.5);
+      // detay katmanı: karo konumundan deterministik varyant (tekrar kırıcı).
+      // Çok uzak zoom'da atlanır — zaten seçilemez, çizim maliyeti düşer.
+      if (z >= 0.75) {
+        const det = f.tileSprites.get(`${biome}:d${tileHash(i) % DETAIL_VARIANTS}`);
+        if (det) {
+          ctx.drawImage(det.cnv, c.x - halfWz - 0.75, c.y - halfHz - 0.75, det.w * z + 1.5, det.h * z + 1.5);
+        }
+      }
       drawn++;
 
       // krallık toprağı tonu
@@ -555,7 +564,6 @@ export function drawScene(f: Frame): void {
       }
 
       // ağaçlar: orman/iğne orman karolarına deterministik dikim
-      const biome = world.tiles[i];
       if ((biome === 'forest' || biome === 'taiga') && !bMap.has(i) && f.treeSprites.length) {
         const count = 1 + (tileHash(i) & 1);
         for (let k = 0; k < count; k++) {
