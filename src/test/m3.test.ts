@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { World } from '../core/world';
 import { Sim } from '../core/sim';
 import { isWater } from '../data/biomes';
+import { completeAll } from './helpers';
 
 function findLand(w: World): { x: number; y: number } {
   for (let y = 12; y < w.H - 12; y++) {
@@ -17,6 +18,7 @@ function simWithVillage(seed = 42): { w: World; s: Sim; p: { x: number; y: numbe
   const s = new Sim(w);
   const p = findLand(w);
   s.applyCommand({ kind: 'place', building: 'center', x: p.x, y: p.y });
+  completeAll(s);
   return { w, s, p };
 }
 
@@ -24,6 +26,7 @@ describe('M3 — Olay sistemi', () => {
   it('yangın çıkar, üretimi durdurur, zamanla binayı yok eder', () => {
     const { s, p } = simWithVillage();
     s.applyCommand({ kind: 'place', building: 'house', x: p.x + 1, y: p.y });
+    completeAll(s);
     expect(s.events.eventFire()).toBe(true);
     const burning = s.player.buildings.find(b => b.burning);
     expect(burning).toBeDefined();
@@ -180,6 +183,7 @@ describe('M3 — Kayıt & determinizm (kritik)', () => {
       const p = findLand(w);
       s.applyCommand({ kind: 'place', building: 'center', x: p.x, y: p.y });
       s.applyCommand({ kind: 'place', building: 'house', x: p.x + 1, y: p.y });
+      completeAll(s);
       for (let i = 0; i < 400; i++) s.tick(0.1);
       s.drainEvents();
       return s.snapshot();
@@ -192,6 +196,7 @@ describe('M3 — Kayıt & determinizm (kritik)', () => {
       const p = findLand(w1);
       s1.applyCommand({ kind: 'place', building: 'center', x: p.x, y: p.y });
       s1.applyCommand({ kind: 'place', building: 'house', x: p.x + 1, y: p.y });
+      completeAll(s1);
       for (let i = 0; i < 200; i++) s1.tick(0.1);
       const saved = JSON.parse(JSON.stringify(s1.serialize()));
       // taze dünya + restore (gerçek yükleme akışı)
@@ -211,6 +216,7 @@ describe('M3 — Kayıt & determinizm (kritik)', () => {
       s.kingdoms.spawn(5);
       const p = findLand(w);
       s.applyCommand({ kind: 'place', building: 'center', x: p.x, y: p.y });
+      completeAll(s);
       s.player.res.food = 450;
       for (let i = 0; i < 1000; i++) s.tick(0.1); // 100 sn — olaylar tetiklenir
       s.drainEvents();

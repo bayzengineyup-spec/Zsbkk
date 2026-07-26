@@ -7,6 +7,7 @@ import type { RNG } from './rng';
 import type { World } from './world';
 import type { KingdomSystem, Kingdom } from './kingdoms';
 import type { TechSystem } from './tech';
+import type { Building, TrainJob } from './sim';
 import {
   UNITS, UNIT_KEYS, COUNTER_BONUS, AI_COMP,
   compTotal, compLabel, type UnitComp, type UnitKey,
@@ -55,6 +56,8 @@ export interface MilitaryHost {
   defense(): number;
   buildingCount(): number;
   hasBarracks(): boolean;
+  /** İşlevsel kışlalar (eğitim kuyruğu bunlarda işler) */
+  barracksList(): Building[];
   hasCenter(): boolean;
   villageCenter(): { x: number; y: number };
   canAfford(cost: Cost): boolean;
@@ -72,18 +75,48 @@ export class MilitarySystem {
 
   constructor(private readonly host: MilitaryHost) {}
 
-  // ---------- eğitim ----------
+  // ---------- eğitim (SÜRELİ kuyruk — Faz 1) ----------
+  static readonly QUEUE_MAX = 5;
+
   train(type: UnitKey): boolean {
     const U = UNITS[type];
     const host = this.host;
-    if (!host.hasBarracks()) { host.toast('Önce Kışla kur.', 'bad'); return false; }
+    const barracks = host.barracksList();
+    if (!barracks.length) { host.toast('Önce Kışla kur.', 'bad'); return false; }
+    // en kısa kuyruklu kışlaya ekle
+    let target = barracks[0];
+    for (const b of barracks) {
+      if ((b.queue?.length ?? 0) < (target.queue?.length ?? 0)) target = b;
+    }
+    if ((target.queue?.length ?? 0) >= MilitarySystem.QUEUE_MAX) {
+      host.toast(`Eğitim kuyruğu dolu (${MilitarySystem.QUEUE_MAX}).`, 'bad');
+      return false;
+    }
     if (host.idle() <= 0) { host.toast('Boşta köylü yok — asker olacak kimse yok.', 'bad'); return false; }
     if (!host.canAfford(U.cost)) { host.toast(`${U.name} için kaynak yetersiz.`, 'bad'); return false; }
     host.pay(U.cost);
-    if (!host.takeIdle()) return false;
-    host.units()[type] += 1;
-    host.toast(`${U.icon} ${U.name} eğitildi.`, 'good');
+    if (!host.takeIdle()) return false; // köylü talime girer
+    // kışla seviyesi eğitimi hızlandırır (sv2: %25 daha hızlı)
+    const time = Math.round(U.time / (1 + 0.25 * (target.level - 1)));
+    if (!target.queue) target.queue = [];
+    target.queue.push({ unit: type, left: time, total: time });
+    host.toast(`${U.icon} ${U.name} eğitime alındı. ⏳${time}sn`, 'good');
     return true;
+  }
+
+  /** Kuyrukları işlet — her kışlada sıradaki asker eğitilir. */
+  private trainTick(dt: number): void {
+    for (const b of this.host.barracksList()) {
+      const q = b.queue;
+      if (!q || !q.length) continue;
+      const job = q[0];
+      job.left -= dt;
+      if (job.left <= 0) {
+        q.shift();
+        this.host.units()[job.unit] += 1;
+        this.host.toast(`${UNITS[job.unit].icon} ${UNITS[job.unit].name} eğitildi.`, 'good');
+      }
+    }
   }
 
   // ---------- komutanlar ----------
@@ -265,6 +298,7 @@ export class MilitarySystem {
 
   // ---------- ordu hareketi ----------
   tick(dt: number): void {
+    this.trainTick(dt);
     for (let ai = this.armies.length - 1; ai >= 0; ai--) {
       const a = this.armies[ai];
       a.px = a.x; a.py = a.y;

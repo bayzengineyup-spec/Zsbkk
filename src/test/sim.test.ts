@@ -4,6 +4,7 @@ import { Sim } from '../core/sim';
 import type { Command } from '../core/commands';
 import { BUILDINGS } from '../data/buildings';
 import { isWater } from '../data/biomes';
+import { completeAll } from './helpers';
 
 /** Testler için: haritada kurulabilir bir kara karosu bul. */
 function findLand(w: World, rule?: (x: number, y: number) => boolean): { x: number; y: number } {
@@ -25,6 +26,8 @@ describe('Sim — bina yerleştirme', () => {
     const { w, s } = newSim();
     const p = findLand(w);
     expect(s.applyCommand({ kind: 'place', building: 'center', x: p.x, y: p.y })).toBe(true);
+    expect(s.player.hasCenter).toBe(false); // inşaat sürüyor (Faz 1)
+    completeAll(s);
     expect(s.player.hasCenter).toBe(true);
     expect(s.player.popCap).toBe(5);
     expect(s.villagers.length).toBe(5);
@@ -74,6 +77,7 @@ describe('Sim — işçi ve üretim', () => {
       && fertile.has(w.tiles[w.idx(x + 1, y)]));
     s.applyCommand({ kind: 'place', building: 'center', x: p.x, y: p.y });
     expect(s.applyCommand({ kind: 'place', building: 'farm', x: p.x + 1, y: p.y })).toBe(true);
+    completeAll(s);
     return { s, fx: p.x + 1, fy: p.y };
   }
 
@@ -106,6 +110,7 @@ describe('Sim — işçi ve üretim', () => {
     const { w, s } = newSim(3);
     const p = findLand(w);
     s.applyCommand({ kind: 'place', building: 'center', x: p.x, y: p.y });
+    completeAll(s);
     s.player.res.food = 0;
     const popBefore = s.player.pop;
     for (let i = 0; i < 200; i++) s.tick(0.1); // 20 sn — birkaç ölüm döngüsü
@@ -119,8 +124,11 @@ describe('Sim — yükseltme ve yıkım', () => {
     const { w, s } = newSim();
     const p = findLand(w);
     s.applyCommand({ kind: 'place', building: 'center', x: p.x, y: p.y });
+    completeAll(s);
     s.player.res.wood = 500; s.player.res.stone = 500;
-    expect(s.applyCommand({ kind: 'upgradeCenter', x: p.x, y: p.y })).toBe(true);
+    expect(s.applyCommand({ kind: 'upgrade', x: p.x, y: p.y })).toBe(true);
+    expect(s.player.popCap).toBe(5); // yükseltme sürerken eski kapasite
+    completeAll(s);
     expect(s.player.popCap).toBe(12);
   });
 
@@ -131,6 +139,7 @@ describe('Sim — yükseltme ve yıkım', () => {
       && fertile.has(w.tiles[w.idx(x + 1, y)]));
     s.applyCommand({ kind: 'place', building: 'center', x: p.x, y: p.y });
     s.applyCommand({ kind: 'place', building: 'farm', x: p.x + 1, y: p.y });
+    completeAll(s);
     s.applyCommand({ kind: 'assign', x: p.x + 1, y: p.y, delta: 1 });
     expect(s.player.idle).toBe(4);
     expect(s.applyCommand({ kind: 'demolish', x: p.x + 1, y: p.y })).toBe(true);

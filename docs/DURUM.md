@@ -4,16 +4,38 @@
 > her oturum sonunda güncellenir. "Neredeydik, ne yaptık, sırada ne var?"
 
 ## 📍 Şu an
-- **Aşama:** 🎉 **FAZ 0 TAMAMLANDI** (M5 ile). Prototipin tüm sistemleri
-  modüler, deterministik, testli motora taşındı. Sırada **Faz 1: İnşA
-  SÜRELERİ + ekonomi derinliği** (docs/03 — kullanıcının özel isteği).
-- **Sürüm:** v0.6 (Faz 0 final) · referans: `prototype/kralliklar-cagi-v0.5.html`.
+- **Aşama:** **FAZ 1 · M1 tamamlandı — İNŞA SÜRELERİ ÇALIŞIYOR** (kullanıcının
+  özel isteği ✔). Sırada Faz 1 · M2: üretim zincirleri (un→ekmek, kereste).
+- **Sürüm:** v0.7-M1 · referans: `prototype/kralliklar-cagi-v0.5.html`.
 - **Son güncelleme:** 2026-07-26 (2. oturum).
 - **Bilinçli ertelenenler:** WebGL atlas (Canvas2D 60 fps veriyor; sprite
   sayısı artınca), iskelet animasyonları + gerçek dokular (Faz 2), kayıt
   slotları/IndexedDB/çevrimdışı ilerleme (Faz 3).
 
 ## ✅ Tamamlanan
+### FAZ 1 · M1 — İnşa Süreleri (2. oturum, devam)
+- **"Bir yer kurunca süre olmalı" ✔** Kur → kaynak düşer → ŞANTİYE:
+  bina zeminden yükselir (clip), iskele direkleri, ilerleme çubuğu, kalan
+  süre. Boşta köylüler şantiyeye koşar ve hızlandırır (işçi başına +%50,
+  en çok 3 → 2.5x). Bitince "tamamlandı" + işlev açılır.
+- **İnşa halindeki bina İŞLEVSİZ:** üretim yok, kapasite yok, işçi atanamaz;
+  merkez tamamlanana dek krallık "kurulmamış" (hasCenter false).
+- **İnşaat kuyruğu sınırı:** eşzamanlı inşaat = merkez seviyesi + 1
+  (meydan yükseltmek kuyruk açar). Merkez muaf.
+- **İptal:** şantiye iptalinde maliyetin %70'i iade.
+- **TÜM binalara süreli yükseltme:** merkez kendi tablosu (süre eklendi);
+  diğerleri formül (maliyet ×sv×1.5, süre ×(1+0.6(sv−1))). Yükseltme
+  sırasında bina ESKİ seviyede çalışmaya devam eder; ev +3 kapasite/sv,
+  ambar depo ×sv, üretim ×sv (mevcut çarpan).
+- **Asker eğitimi SÜRELİ kuyruk:** kışla başına 5'lik kuyruk (mızrakçı 8sn /
+  okçu 10sn / süvari 14sn; kışla sv2 %25 hızlı). Köylü kuyruğa girince
+  ayrılır, süre bitince asker olur. Kışla yıkılırsa kuyruktakiler geri döner.
+- **UI:** şantiye paneli (ilerleme/işçi/iptal), her binada ⬆ yükselt
+  (maliyet+süre), kışla kuyruğu görünümü, inşa kartlarında ⏳süre.
+- **Testler: 81/81** — 9 yeni Faz 1 testi (işçi hızlandırma kanıtı, kuyruk
+  sınırı, iade, işlevsizlik, yükseltme etkileri, **şantiye+kuyruk ortasında
+  kayıt roundtrip determinizmi**). Eski testler süreli inşaya uyarlandı
+  (test yardımcıları: completeAll/trainMany).
 ### Faz 0 · M5 — Atmosfer & Parite (2. oturum, devam)
 - **Yaban hayatı** (`core/wildlife.ts` + `data/species.ts`): 7 tür (geyik,
   kurt sürüsü, ayı, domuz, tavşan + koyun/inek), biyoma göre dağılım,
@@ -125,15 +147,13 @@
 - Master plan yazıldı: `docs/00`…`docs/12` + bu DURUM dosyası.
 - Prototip repoya alındı (`prototype/`).
 
-## 🔜 Sıradaki adım — FAZ 1: İnşa Süreleri & Ekonomi (docs/03)
-Kullanıcının özel isteği: **"bir yer kurunca süre olmalı."**
-1. İnşa/yükseltme SÜRE sistemi: kur → "inşa halinde" → ilerleme çubuğu →
-   işçi sayısı süreyi kısaltır → bitince aktif. İptal = kısmi iade.
-2. Aşamalı inşa görseli (iskele → yarım → tam).
-3. İnşa kuyruğu (merkez seviyesi = eşzamanlı inşaat sınırı).
-4. Tüm binalara seviye/yükseltme (şimdilik yalnız meydan).
-5. Asker eğitimi de süreli kuyruğa geçer.
-6. İlk üretim zincirleri (un→ekmek, kereste) — çağ sistemine hazırlık.
+## 🔜 Sıradaki adım — FAZ 1 · M2: Üretim Zincirleri (docs/03)
+1. Yeni kaynaklar: tahıl → un → ekmek; kütük → kereste (girdi tüketen binalar).
+2. Yeni binalar: Değirmen, Fırın, Bıçkıhane (girdi/çıktı akışı).
+3. Kaynağa özel depo uyarıları ("ambar dolu, üretim boşa gidiyor").
+4. Denge testi: zincirin bir halkası durunca alt üretim yavaşlamalı.
+Sonra Faz 2 (gerçek dokular — her öğe için ayrı) veya Faz 3 (kayıt
+genişletme, çevrimdışı ilerleme).
 - Not: Görseller (karo + bina + köylü + ordu + hayvan) bilinçli yer tutucu —
   **gerçek dokular Faz 2'de her öğe için ayrı ayrı üretilecek** (kullanıcının
   açık talebi).
@@ -153,6 +173,10 @@ Kullanıcının özel isteği: **"bir yer kurunca süre olmalı."**
 - Ekonomi zinciri kaç adım derin olacak.
 
 ## 📝 Oturum notları
+- **2026-07-26 (2f):** FAZ 1 M1 — İNŞA SÜRELERİ: şantiye (yükselen bina +
+  iskele + ilerleme çubuğu), işçi hızlandırma, kuyruk sınırı, %70 iade,
+  tüm binalara süreli yükseltme, süreli asker eğitim kuyruğu. 81 test
+  (şantiye ortasında kayıt determinizmi dahil).
 - **2026-07-26 (2e):** 🎉 FAZ 0 KAPANDI — M5: yaban hayatı, kervanlar,
   gündüz/gece, sentez ses motoru + üretken müzik, 9 adımlı öğretici, menü
   (ses/dışa-içe aktar). 71 test yeşil. Prototip paritesi (görseller hariç,

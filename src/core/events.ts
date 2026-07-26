@@ -48,7 +48,8 @@ export interface EventHost {
 
 export class EventSystem {
   activeEffects: ActiveEffect[] = [];
-  private eventAcc = 0;
+  /** Rastgele olay zamanlayıcısı (testler devre dışı bırakabilir). */
+  eventAcc = 0;
   private plagueTimer = 0;
 
   constructor(private readonly host: EventHost) {}

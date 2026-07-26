@@ -15,23 +15,25 @@ export interface UnitDef {
   def: number;
   /** karşıtı (bu birime karşı bonus alır) */
   vs: UnitKey;
+  /** eğitim süresi (saniye) */
+  time: number;
   desc: string;
 }
 
 export const UNITS: Record<UnitKey, UnitDef> = {
   spear: {
     name: 'Mızrakçı', icon: '🛡️', cost: { food: 15, wood: 10 },
-    atk: 9, def: 14, vs: 'cav',
+    atk: 9, def: 14, vs: 'cav', time: 8,
     desc: 'Süvariye karşı güçlü, ucuz ve dayanıklı',
   },
   archer: {
     name: 'Okçu', icon: '🏹', cost: { food: 12, wood: 20 },
-    atk: 14, def: 11, vs: 'spear',
+    atk: 14, def: 11, vs: 'spear', time: 10,
     desc: 'Mızrakçıyı biçer, ama yakın dövüşte zayıf',
   },
   cav: {
     name: 'Süvari', icon: '🐎', cost: { food: 22, gold: 14 },
-    atk: 16, def: 11, vs: 'archer',
+    atk: 16, def: 11, vs: 'archer', time: 14,
     desc: 'Okçuyu ezer, hızlı — ama sura karşı kötü',
   },
 };

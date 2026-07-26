@@ -3,6 +3,7 @@ import { World } from '../core/world';
 import { Sim } from '../core/sim';
 import { SPECIES } from '../data/species';
 import { isWater } from '../data/biomes';
+import { completeAll } from './helpers';
 
 function findLand(w: World): { x: number; y: number } {
   for (let y = 12; y < w.H - 12; y++) {
@@ -52,6 +53,7 @@ describe('M5 — Yaban hayatı', () => {
     expect(p).not.toBeNull();
     s.applyCommand({ kind: 'place', building: 'center', x: p!.x, y: p!.y });
     s.applyCommand({ kind: 'place', building: 'farm', x: p!.x + 1, y: p!.y });
+    completeAll(s);
     s.player.res.food = 400;
     for (let i = 0; i < 50; i++) s.tick(0.1); // 5 sn — senkron 2 sn'de bir
     const farmAnimals = s.wildlife.creatures.filter(c => SPECIES[c.sp].farm);
@@ -66,6 +68,7 @@ describe('M5 — Kervanlar', () => {
     s.kingdoms.spawn(3);
     const p = findLand(w);
     s.applyCommand({ kind: 'place', building: 'center', x: p.x, y: p.y });
+    completeAll(s);
     const k = s.kingdoms.kingdoms[0];
     k.tradeDeal = true;
     s.player.res.food = 450;
@@ -87,6 +90,7 @@ describe('M5 — Tüm sistemler dahil kayıt determinizmi', () => {
       s.wildlife.spawn();
       const p = findLand(w);
       s.applyCommand({ kind: 'place', building: 'center', x: p.x, y: p.y });
+      completeAll(s);
       s.player.res.food = 450;
       const k = s.kingdoms.kingdoms[0];
       k.tradeDeal = true;

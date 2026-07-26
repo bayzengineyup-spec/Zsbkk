@@ -6,7 +6,7 @@
 import { World } from './core/world';
 import { Sim } from './core/sim';
 import { BIOMES } from './data/biomes';
-import { BUILDINGS, costStr, type BuildingType } from './data/buildings';
+import { BUILDINGS, costStr, upgradeCost, upgradeTime, type BuildingType } from './data/buildings';
 import { Camera, type Viewport } from './render/camera';
 import { buildTileSprites } from './render/tiles';
 import { buildBuildingSprites } from './render/buildings';
@@ -118,7 +118,27 @@ function refreshTileInfo(): void {
 
   if (b && sim) {
     const def = BUILDINGS[b.type];
-    el('ti-name').textContent = `${def.icon} ${def.name} · sv ${b.level}${b.burning ? ' 🔥' : ''}`;
+    // ---- şantiye görünümü (ilk inşa) ----
+    if (b.buildLeft !== undefined && !b.upgrading) {
+      const pct = Math.round((1 - b.buildLeft / (b.buildTotal ?? 1)) * 100);
+      el('ti-name').textContent = `🏗️ ${def.name} · inşa ediliyor`;
+      el('ti-l1').textContent = `İlerleme: %${pct} · kalan ~${Math.ceil(b.buildLeft)}sn`;
+      el('ti-l2').textContent = `Şantiye işçisi: ${b.builders ?? 0} (boşta köylüler hızlandırır)`;
+      el('ti-l3').textContent = '';
+      act.innerHTML = '';
+      act.style.display = 'flex';
+      const cancel = document.createElement('button');
+      cancel.className = 'danger';
+      cancel.textContent = '✖ İptal (%70 iade)';
+      cancel.onclick = () => { sim!.applyCommand({ kind: 'demolish', x: gx, y: gy }); hideInfo(); refreshHUD(); };
+      act.append(cancel);
+      tileinfo.classList.add('show');
+      return;
+    }
+    const upgradingTxt = b.upgrading && b.buildLeft !== undefined
+      ? ` · ⬆ %${Math.round((1 - b.buildLeft / (b.buildTotal ?? 1)) * 100)}`
+      : '';
+    el('ti-name').textContent = `${def.icon} ${def.name} · sv ${b.level}${upgradingTxt}${b.burning ? ' 🔥' : ''}`;
     el('ti-l1').textContent = def.desc;
     el('ti-l2').textContent = def.maxWorkers
       ? `İşçi: ${b.workers}/${def.maxWorkers} · Boşta: ${sim.player.idle}`
@@ -146,13 +166,20 @@ function refreshTileInfo(): void {
       act.append(minus, plus);
     }
     if (b.type === 'barracks') {
-      // asker eğitimi + komutanlar
+      // asker eğitimi (süreli kuyruk) + komutanlar
       el('ti-l2').textContent = `Ordu: ${compLabel(sim.player.units)} · Boşta: ${sim.player.idle}`;
+      const q = b.queue ?? [];
+      if (q.length) {
+        const head = q[0];
+        el('ti-l1').textContent =
+          `Eğitim: ${UNITS[head.unit].icon} %${Math.round((1 - head.left / head.total) * 100)}`
+          + ` · kuyruk: ${q.map(j => UNITS[j.unit].icon).join('')} (${q.length}/5)`;
+      }
       for (const u of UNIT_KEYS) {
         const btn = document.createElement('button');
-        btn.textContent = `${UNITS[u].icon} ${costStr(UNITS[u].cost)}`;
+        btn.textContent = `${UNITS[u].icon} ${costStr(UNITS[u].cost)} ⏳${UNITS[u].time}sn`;
         btn.title = `${UNITS[u].name} — ${UNITS[u].desc}`;
-        btn.disabled = sim.player.idle <= 0 || !sim.canAfford(UNITS[u].cost);
+        btn.disabled = sim.player.idle <= 0 || !sim.canAfford(UNITS[u].cost) || q.length >= 5;
         btn.onclick = () => { sim!.applyCommand({ kind: 'train', unit: u }); refreshTileInfo(); refreshHUD(); };
         act.append(btn);
       }
@@ -170,16 +197,25 @@ function refreshTileInfo(): void {
           .join(' · ');
       }
     }
-    if (b.type === 'center') {
-      const ups = BUILDINGS.center.upgrade!;
-      if (b.level - 1 < ups.length) {
+    // ---- yükseltme (tüm binalar süreli) ----
+    if (b.buildLeft === undefined) {
+      let upCost = null, upTime = 0;
+      if (b.type === 'center') {
+        const ups = BUILDINGS.center.upgrade!;
+        if (b.level - 1 < ups.length) { upCost = ups[b.level - 1].cost; upTime = ups[b.level - 1].time; }
+      } else if (b.level < def.maxLevel) {
+        upCost = upgradeCost(def, b.level + 1);
+        upTime = upgradeTime(def, b.level + 1);
+      }
+      if (upCost) {
         const up = document.createElement('button');
-        up.textContent = `⬆ Yükselt (${costStr(ups[b.level - 1].cost)})`;
-        up.disabled = !sim.canAfford(ups[b.level - 1].cost);
-        up.onclick = () => { sim!.applyCommand({ kind: 'upgradeCenter', x: gx, y: gy }); refreshTileInfo(); refreshHUD(); };
+        up.textContent = `⬆ Yükselt (${costStr(upCost)}) ⏳${upTime}sn`;
+        up.disabled = !sim.canAfford(upCost);
+        up.onclick = () => { sim!.applyCommand({ kind: 'upgrade', x: gx, y: gy }); refreshTileInfo(); refreshHUD(); };
         act.append(up);
       }
-    } else {
+    }
+    if (b.type !== 'center') {
       const dem = document.createElement('button');
       dem.className = 'danger';
       dem.textContent = '🗑 Yık';
@@ -214,7 +250,7 @@ function openBuildPanel(): void {
     card.className = 'bcard' + (afford ? '' : ' poor');
     card.innerHTML = `<div class="bic">${def.icon}</div>`
       + `<div class="bnm">${def.name}</div>`
-      + `<div class="bcost">${costStr(def.cost)}</div>`;
+      + `<div class="bcost">${costStr(def.cost)} · ⏳${def.buildTime}sn</div>`;
     card.title = def.desc;
     card.onclick = () => {
       if (!sim!.canAfford(def.cost)) { toast('Yeterli kaynak yok.', 'bad'); return; }

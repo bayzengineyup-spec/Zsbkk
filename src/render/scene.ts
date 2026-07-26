@@ -299,6 +299,62 @@ function drawVillager(f: Frame, v: Villager): void {
   ctx.fill();
 }
 
+/** İlerleme çubuğu (şantiye/yükseltme/eğitim). */
+function drawProgressBar(f: Frame, sx: number, sy: number, prog: number, color: string): void {
+  const { ctx } = f;
+  const z = f.cam.zoom;
+  const w = 26 * z, h = 4 * z;
+  ctx.fillStyle = 'rgba(10,7,4,0.75)';
+  ctx.beginPath();
+  ctx.roundRect(sx - w / 2 - z, sy - h / 2 - z, w + 2 * z, h + 2 * z, 2 * z);
+  ctx.fill();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.roundRect(sx - w / 2, sy - h / 2, Math.max(1, w * Math.max(0, Math.min(1, prog))), h, 1.5 * z);
+  ctx.fill();
+}
+
+/** Şantiye: bina zeminden yükselir + iskele direkleri + ilerleme çubuğu. */
+function drawConstruction(
+  f: Frame, spr: BuildingSprite, gx: number, gy: number, h: number, prog: number,
+): void {
+  const { ctx, cam } = f;
+  const z = cam.zoom;
+  const c = cam.worldToScreen(gx, gy, h);
+  const drawX = c.x - (spr.w / 2) * z;
+  const drawY = c.y - spr.anchorY * z;
+  const fullH = spr.h * z;
+  // bina alttan yukarı "yükselir": yalnız alt kısmı çiz (clip)
+  const visibleH = fullH * (0.15 + 0.85 * prog);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(drawX - z, drawY + (fullH - visibleH), spr.w * z + 2 * z, visibleH + z);
+  ctx.clip();
+  ctx.globalAlpha = 0.55 + 0.45 * prog;
+  ctx.drawImage(spr.cnv, drawX, drawY, spr.w * z, fullH);
+  ctx.globalAlpha = 1;
+  ctx.restore();
+  // iskele direkleri
+  ctx.strokeStyle = '#8a6a42';
+  ctx.lineWidth = 1.4 * z;
+  const poleH = fullH * 0.8;
+  for (const off of [-0.42, 0.42]) {
+    const px = c.x + off * spr.w * z;
+    ctx.beginPath();
+    ctx.moveTo(px, c.y + 4 * z);
+    ctx.lineTo(px, c.y + 4 * z - poleH);
+    ctx.stroke();
+  }
+  // yatay kalas
+  ctx.beginPath();
+  ctx.moveTo(c.x - 0.42 * spr.w * z, c.y + 4 * z - poleH * 0.7);
+  ctx.lineTo(c.x + 0.42 * spr.w * z, c.y + 4 * z - poleH * 0.7);
+  ctx.stroke();
+  // ilerleme çubuğu
+  drawProgressBar(f, c.x, drawY - 4 * z, prog, '#d9a441');
+  f.stats.sprites++;
+}
+
 function drawBuildingSprite(
   f: Frame, spr: BuildingSprite, gx: number, gy: number, h: number, alpha = 1,
 ): void {
@@ -431,11 +487,22 @@ export function drawScene(f: Frame): void {
         drawCapital(f, c.x, c.y, owner.color);
       }
 
-      // bina
+      // bina (şantiye: yükselen görsel + ilerleme çubuğu)
       const b = bMap.get(i);
       if (b) {
         const bspr = f.bSprites.get(b.type);
-        if (bspr) drawBuildingSprite(f, bspr, gx, gy, h);
+        if (bspr) {
+          if (b.buildLeft !== undefined && !b.upgrading) {
+            const prog = 1 - b.buildLeft / (b.buildTotal ?? 1);
+            drawConstruction(f, bspr, gx, gy, h, prog);
+          } else {
+            drawBuildingSprite(f, bspr, gx, gy, h);
+            if (b.upgrading && b.buildLeft !== undefined) {
+              const prog = 1 - b.buildLeft / (b.buildTotal ?? 1);
+              drawProgressBar(f, c.x, c.y - 30 * z, prog, '#7fb3d5');
+            }
+          }
+        }
         if (b.burning) drawFlames(f, c.x, c.y);
       }
 

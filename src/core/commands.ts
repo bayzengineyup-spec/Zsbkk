@@ -12,7 +12,7 @@ import type { TechId } from '../data/techs';
 export type Command =
   | { kind: 'place'; building: BuildingType; x: number; y: number }
   | { kind: 'assign'; x: number; y: number; delta: 1 | -1 }
-  | { kind: 'upgradeCenter'; x: number; y: number }
+  | { kind: 'upgrade'; x: number; y: number }
   | { kind: 'demolish'; x: number; y: number }
   | { kind: 'extinguish'; x: number; y: number }
   | { kind: 'diplo'; kingdomId: number; action: DiploAction }

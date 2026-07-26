@@ -17,13 +17,19 @@ import { MilitarySystem, type MilitaryHost } from './military';
 import { WildlifeSystem, type WildlifeHost } from './wildlife';
 import { CaravanSystem, type CaravanHost } from './caravans';
 import {
-  BUILDINGS, BASE_STORAGE,
+  BUILDINGS, BASE_STORAGE, upgradeCost, upgradeTime,
   type BuildingType, type Cost, type ResKey,
 } from '../data/buildings';
 import { SEASONS, SEASON_LEN, type SeasonDef } from '../data/seasons';
 import { ADLAR } from '../data/names';
 import { isWater } from '../data/biomes';
 import { compTotal, type UnitComp } from '../data/units';
+
+export interface TrainJob {
+  unit: 'spear' | 'archer' | 'cav';
+  left: number;
+  total: number;
+}
 
 export interface Building {
   type: BuildingType;
@@ -33,6 +39,20 @@ export interface Building {
   workers: number;
   burning?: boolean;
   hp?: number;
+  /** inşa/yükseltme kalan süre (saniye) — undefined = tamamlanmış */
+  buildLeft?: number;
+  buildTotal?: number;
+  /** true ise yükseltme: bina mevcut seviyede çalışmaya devam eder */
+  upgrading?: boolean;
+  /** bu tick şantiyeye yardım eden boşta köylü sayısı (görsel + hız) */
+  builders?: number;
+  /** kışla eğitim kuyruğu */
+  queue?: TrainJob[];
+}
+
+/** Bina işlevsel mi? (İlk inşaatı süren bina çalışmaz; yükseltilen çalışır.) */
+export function isActive(b: Building): boolean {
+  return b.buildLeft === undefined || b.upgrading === true;
 }
 
 export interface Villager {
@@ -70,7 +90,7 @@ export interface SimEvent {
 }
 
 /** Kayıt formatı sürümü — migrasyon için (docs/10-KAYIT). */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export interface GameOver {
   won: boolean;
@@ -124,7 +144,7 @@ export class Sim {
 
     const techHost: TechHost = {
       res: this.player.res,
-      hasAcademy: () => this.player.buildings.some(b => b.type === 'academy'),
+      hasAcademy: () => this.player.buildings.some(b => b.type === 'academy' && isActive(b)),
       recalcCaps: () => this.recalcCaps(),
       toast: (msg, kind) => this.toast(msg, kind ?? ''),
     };
@@ -198,6 +218,7 @@ export class Sim {
       defense: () => this.player.defense,
       buildingCount: () => this.player.buildings.length,
       hasBarracks: () => this.hasBarracks(),
+      barracksList: () => this.player.buildings.filter(b => b.type === 'barracks' && isActive(b)),
       hasCenter: () => this.player.hasCenter,
       villageCenter: () => this.villageCenter(),
       canAfford: (c) => this.canAfford(c),
@@ -232,7 +253,7 @@ export class Sim {
   }
 
   hasBarracks(): boolean {
-    return this.player.buildings.some(b => b.type === 'barracks');
+    return this.player.buildings.some(b => b.type === 'barracks' && isActive(b));
   }
 
   // ---------- olay kuyruğu ----------
@@ -323,7 +344,7 @@ export class Sim {
     switch (cmd.kind) {
       case 'place': return this.placeBuilding(cmd.building, cmd.x, cmd.y);
       case 'assign': return this.assignWorker(cmd.x, cmd.y, cmd.delta);
-      case 'upgradeCenter': return this.upgradeCenter(cmd.x, cmd.y);
+      case 'upgrade': return this.upgradeBuilding(cmd.x, cmd.y);
       case 'demolish': return this.demolishAt(cmd.x, cmd.y);
       case 'extinguish': {
         const b = this.buildingAt(cmd.x, cmd.y);
@@ -340,36 +361,94 @@ export class Sim {
     }
   }
 
+  /** Aynı anda yürüyebilecek inşaat sayısı: merkez seviyesi + 1 (merkez muaf). */
+  buildQueueLimit(): number {
+    const c = this.player.buildings.find(b => b.type === 'center');
+    return c ? c.level + 1 : 1;
+  }
+
+  activeConstructionCount(): number {
+    return this.player.buildings
+      .filter(b => b.buildLeft !== undefined && b.type !== 'center')
+      .length;
+  }
+
   private placeBuilding(type: BuildingType, x: number, y: number): boolean {
     const def = BUILDINGS[type];
     if (def.unique && this.player.buildings.some(b => b.type === type)) {
       this.toast(`Zaten bir ${def.name} var.`, 'bad'); return false;
     }
     if (!this.canPlaceOn(type, x, y)) { this.toast('Buraya kurulamaz.', 'bad'); return false; }
+    // inşaat kuyruğu sınırı (merkez muaf — o her zaman kurulabilir)
+    if (type !== 'center' && this.activeConstructionCount() >= this.buildQueueLimit()) {
+      this.toast(`İnşaat kuyruğu dolu (${this.buildQueueLimit()}). Meydanı yükselt.`, 'bad');
+      return false;
+    }
     const cost = this.tech.scaledCost(def.cost); // taş ustalığı indirimi
     if (!this.canAfford(cost)) { this.toast('Yeterli kaynak yok.', 'bad'); return false; }
     this.pay(cost);
-    this.player.buildings.push({ type, x, y, level: 1, workers: 0 });
-    if (type === 'center') {
-      this.player.hasCenter = true;
+    this.player.buildings.push({
+      type, x, y, level: 1, workers: 0,
+      buildLeft: def.buildTime, buildTotal: def.buildTime,
+    });
+    if (type === 'center' && this.villagers.length === 0) {
+      // halk şantiyeye gelir; meydan TAMAMLANINCA köy resmen kurulur
       this.syncVillagers();
     }
     this.recalcCaps();
     this.recalcDefense();
     this.updateFog();
-    this.toast(`${def.name} kuruldu.`, 'good');
+    this.toast(`${def.name} inşaatı başladı. ⏳${def.buildTime}sn`, 'good');
     return true;
+  }
+
+  /** İnşaat ilerlemesi: boşta köylüler şantiyelere dağılır ve hızlandırır. */
+  private constructionTick(dt: number): void {
+    const sites = this.player.buildings.filter(b => b.buildLeft !== undefined);
+    if (!sites.length) return;
+    // işçi dağıtımı: sırayla her şantiyeye en fazla 3 boşta köylü
+    let avail = this.player.idle;
+    for (const b of sites) {
+      b.builders = Math.min(3, avail);
+      avail -= b.builders;
+    }
+    for (const b of sites) {
+      const speed = 1 + 0.5 * (b.builders ?? 0); // 3 işçiyle 2.5x
+      b.buildLeft = (b.buildLeft ?? 0) - dt * speed;
+      if (b.buildLeft <= 0) this.finishConstruction(b);
+    }
+  }
+
+  private finishConstruction(b: Building): void {
+    const def = BUILDINGS[b.type];
+    delete b.buildLeft;
+    delete b.buildTotal;
+    delete b.builders;
+    if (b.upgrading) {
+      delete b.upgrading;
+      b.level++;
+      this.toast(`⬆ ${def.name} seviye ${b.level} oldu!`, 'good');
+    } else if (b.type === 'center') {
+      this.player.hasCenter = true;
+      this.toast('🏛️ Köy Meydanı tamamlandı — krallığın kuruldu!', 'good');
+    } else {
+      this.toast(`${def.name} tamamlandı.`, 'good');
+    }
+    this.recalcCaps();
+    this.recalcDefense();
+    this.updateFog();
   }
 
   recalcDefense(): void {
     this.player.defense = this.player.buildings
-      .filter(b => b.type === 'wall')
+      .filter(b => b.type === 'wall' && isActive(b))
       .reduce((s) => s + (BUILDINGS.wall.defense ?? 0), 0);
   }
 
   private assignWorker(x: number, y: number, delta: 1 | -1): boolean {
     const b = this.buildingAt(x, y);
     if (!b) return false;
+    if (!isActive(b)) { this.toast('Bina henüz inşa halinde.', 'bad'); return false; }
     const def = BUILDINGS[b.type];
     if (!def.maxWorkers) return false;
     if (delta > 0) {
@@ -384,17 +463,34 @@ export class Sim {
     return true;
   }
 
-  private upgradeCenter(x: number, y: number): boolean {
+  /** Tüm binalar için süreli yükseltme (merkez kendi tablosunu kullanır). */
+  private upgradeBuilding(x: number, y: number): boolean {
     const b = this.buildingAt(x, y);
-    if (!b || b.type !== 'center') return false;
-    const ups = BUILDINGS.center.upgrade!;
-    if (b.level - 1 >= ups.length) { this.toast('Azami seviyede.', 'bad'); return false; }
-    const nx = ups[b.level - 1];
-    if (!this.canAfford(nx.cost)) { this.toast('Yükseltme için kaynak yetersiz.', 'bad'); return false; }
-    this.pay(nx.cost);
-    b.level++;
-    this.recalcCaps();
-    this.toast(`Köy Meydanı seviye ${b.level}! 🎉`, 'good');
+    if (!b) return false;
+    if (b.buildLeft !== undefined) { this.toast('Zaten bir inşaat sürüyor.', 'bad'); return false; }
+    const def = BUILDINGS[b.type];
+    let cost: Cost, time: number;
+    if (b.type === 'center') {
+      const ups = def.upgrade!;
+      if (b.level - 1 >= ups.length) { this.toast('Azami seviyede.', 'bad'); return false; }
+      cost = ups[b.level - 1].cost;
+      time = ups[b.level - 1].time;
+    } else {
+      if (b.level >= def.maxLevel) { this.toast('Azami seviyede.', 'bad'); return false; }
+      cost = upgradeCost(def, b.level + 1);
+      time = upgradeTime(def, b.level + 1);
+    }
+    if (!this.canAfford(cost)) { this.toast('Yükseltme için kaynak yetersiz.', 'bad'); return false; }
+    // yükseltme de kuyruğa tabidir
+    if (this.activeConstructionCount() >= this.buildQueueLimit() && b.type !== 'center') {
+      this.toast(`İnşaat kuyruğu dolu (${this.buildQueueLimit()}).`, 'bad');
+      return false;
+    }
+    this.pay(cost);
+    b.buildLeft = time;
+    b.buildTotal = time;
+    b.upgrading = true;
+    this.toast(`⬆ ${def.name} yükseltiliyor. ⏳${time}sn`, 'good');
     return true;
   }
 
@@ -402,6 +498,19 @@ export class Sim {
     const b = this.buildingAt(x, y);
     if (!b) return false;
     if (b.type === 'center') { this.toast('Köy Meydanı yıkılamaz.', 'bad'); return false; }
+    // inşaat iptali: maliyetin %70'i iade
+    if (b.buildLeft !== undefined && !b.upgrading) {
+      const cost = this.tech.scaledCost(BUILDINGS[b.type].cost);
+      for (const k of Object.keys(cost) as ResKey[]) {
+        this.player.res[k] = Math.min(
+          this.player.storageCap,
+          this.player.res[k] + Math.floor((cost[k] ?? 0) * 0.7),
+        );
+      }
+      this.removeBuilding(b);
+      this.toast(`${BUILDINGS[b.type].name} inşaatı iptal edildi (%70 iade).`, '');
+      return true;
+    }
     this.removeBuilding(b);
     this.toast(`${BUILDINGS[b.type].name} yıkıldı.`, '');
     return true;
@@ -409,6 +518,8 @@ export class Sim {
 
   removeBuilding(b: Building): void {
     if (b.workers > 0) { this.player.idle += b.workers; b.workers = 0; }
+    // eğitim kuyruğundaki köylüler geri döner (kaynak yanar)
+    if (b.queue?.length) { this.player.idle += b.queue.length; b.queue = []; }
     this.player.buildings = this.player.buildings.filter(x => x !== b);
     if (b.type === 'center') {
       this.player.hasCenter = this.player.buildings.some(x => x.type === 'center');
@@ -421,14 +532,15 @@ export class Sim {
   recalcCaps(): void {
     let popCap = 0, storage = BASE_STORAGE;
     for (const b of this.player.buildings) {
+      if (!isActive(b)) continue; // inşa halindeki bina katkı vermez
       const def = BUILDINGS[b.type];
       if (def.popCap) {
         popCap += ((b.type === 'center' && b.level > 1)
           ? BUILDINGS.center.upgrade![b.level - 2].popCap
           : def.popCap)
-          + (b.type === 'house' ? this.tech.housing() : 0); // kat mimarisi
+          + (b.type === 'house' ? (b.level - 1) * 3 + this.tech.housing() : 0);
       }
-      if (def.storage) storage += def.storage;
+      if (def.storage) storage += def.storage * b.level; // ambar seviyeyle katlanır
     }
     this.player.popCap = popCap;
     this.player.storageCap = Math.round(storage * this.tech.storage()); // büyük ambarlar
@@ -490,6 +602,14 @@ export class Sim {
       const def = BUILDINGS[b.type];
       if (!def.maxWorkers) continue;
       for (let w = 0; w < b.workers && vi < this.villagers.length; w++) {
+        this.villagers[vi].job = { bx: b.x, by: b.y };
+        vi++;
+      }
+    }
+    // boşta köylüler şantiyelere koşar (görsel — builders sayısı kadar)
+    for (const b of this.player.buildings) {
+      if (b.buildLeft === undefined || !b.builders) continue;
+      for (let w = 0; w < b.builders && vi < this.villagers.length; w++) {
         this.villagers[vi].job = { bx: b.x, by: b.y };
         vi++;
       }
@@ -637,7 +757,8 @@ export class Sim {
     for (const b of p.buildings) {
       const def = BUILDINGS[b.type];
       if (!def.prod || b.workers <= 0) continue;
-      if (b.burning) continue; // yanan bina üretmez
+      if (b.burning) continue;   // yanan bina üretmez
+      if (!isActive(b)) continue; // inşa halindeki bina üretmez
       for (const k of Object.keys(def.prod) as ResKey[]) {
         let gain = (def.prod[k] ?? 0) * b.workers * b.level * moodMult * evMult * dt
           * this.tech.prodMult(k, b.type);
@@ -694,6 +815,8 @@ export class Sim {
     if (this.gameOver) return; // oyun bitti — sim durur
     for (const v of this.villagers) { v.px = v.x; v.py = v.y; }
     this.updateTime(dt);
+    this.constructionTick(dt);
+    this.assignJobsToVillagers(); // işçi + şantiye görevleri (deterministik sıra)
     this.events.tick(dt);
     this.economyTick(dt);
     this.updateVillagers(dt);

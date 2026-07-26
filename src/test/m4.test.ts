@@ -3,6 +3,7 @@ import { World } from '../core/world';
 import { Sim } from '../core/sim';
 import { compTotal } from '../data/units';
 import { isWater } from '../data/biomes';
+import { completeAll, trainMany } from './helpers';
 
 function findLand(w: World): { x: number; y: number } {
   for (let y = 12; y < w.H - 12; y++) {
@@ -22,6 +23,8 @@ function warVillage(seed = 42): { w: World; s: Sim; p: { x: number; y: number } 
   s.player.res.food = 400; s.player.res.wood = 400;
   s.player.res.stone = 400; s.player.res.gold = 400;
   s.applyCommand({ kind: 'place', building: 'barracks', x: p.x + 1, y: p.y });
+  completeAll(s);
+  s.events.eventAcc = -1e9; // uzun testlerde rastgele olaylar karışmasın
   return { w, s, p };
 }
 
@@ -34,22 +37,29 @@ describe('M4 — Asker eğitimi', () => {
     expect(s.applyCommand({ kind: 'train', unit: 'spear' })).toBe(false);
   });
 
-  it('eğitim: kaynak + boşta köylü düşer, birim artar', () => {
+  it('eğitim SÜRELİ kuyruktadır: köylü hemen ayrılır, birim süre sonunda çıkar', () => {
     const { s } = warVillage();
     const idleBefore = s.player.idle;
     expect(s.applyCommand({ kind: 'train', unit: 'spear' })).toBe(true);
     expect(s.applyCommand({ kind: 'train', unit: 'archer' })).toBe(true);
+    expect(s.player.idle).toBe(idleBefore - 2); // köylüler talime girdi
+    expect(s.player.units.spear).toBe(0);       // ama henüz asker değiller
+    // mızrakçı 8sn + okçu 10sn = 18sn sıralı kuyruk
+    for (let i = 0; i < 90; i++) s.tick(0.1);   // 9 sn → mızrakçı çıktı
     expect(s.player.units.spear).toBe(1);
+    expect(s.player.units.archer).toBe(0);
+    for (let i = 0; i < 110; i++) s.tick(0.1);  // +11 sn → okçu da çıktı
     expect(s.player.units.archer).toBe(1);
-    expect(s.player.idle).toBe(idleBefore - 2);
   });
 
-  it('boşta köylü kalmayınca eğitim durur', () => {
+  it('boşta köylü kalmayınca eğitim durur (kuyruk sınırı 5)', () => {
     const { s } = warVillage();
-    let trained = 0;
-    while (s.applyCommand({ kind: 'train', unit: 'spear' })) trained++;
-    expect(trained).toBe(5); // 5 köylünün hepsi asker oldu
+    let queued = 0;
+    while (s.applyCommand({ kind: 'train', unit: 'spear' })) queued++;
+    expect(queued).toBe(5); // 5 köylünün hepsi kuyruğa girdi
     expect(s.player.idle).toBe(0);
+    trainMany(s, 'spear', 0); // kuyruğu boşalt
+    expect(s.player.units.spear).toBe(5);
   });
 });
 
@@ -83,13 +93,17 @@ describe('M4 — Ordu yürüyüşü ve savaş', () => {
     const { s } = warVillage(7);
     s.kingdoms.spawn(3);
     const k = s.kingdoms.kingdoms[0];
-    k.army = 1; k.pop = 5; // zayıf hedef
     // güçlü ordu kur
     s.player.pop = 30; s.player.idle = 30; s.player.popCap = 40;
     s.syncVillagers();
-    for (let i = 0; i < 20; i++) s.applyCommand({ kind: 'train', unit: 'spear' });
+    // 30 nüfus eğitim süresince yiyecek tüketir — bol stok
+    s.player.storageCap = 5000;
+    s.player.res.food = 2000; s.player.res.wood = 800;
+    trainMany(s, 'spear', 20);
     expect(compTotal(s.player.units)).toBe(20);
-    const tilesBefore = k.tiles.size;
+    // hedefi zayıflat ve büyümesini dondur (eğitim sırasında ordu biriktirmesin)
+    k.army = 1; k.pop = 5;
+    k.growAcc = -1e9; k.expandAcc = -1e9;
     const goldBefore = s.player.res.gold;
     expect(s.applyCommand({ kind: 'attack', kingdomId: k.id })).toBe(true);
     expect(compTotal(s.player.units)).toBe(0); // ordu yola çıktı
@@ -97,14 +111,14 @@ describe('M4 — Ordu yürüyüşü ve savaş', () => {
     // ordu hedefe varana + dönene dek işlet (hız 3.5/sn, harita 64)
     for (let i = 0; i < 1200; i++) s.tick(0.1);
     const kAfter = s.kingdoms.byId(k.id);
-    if (kAfter) expect(kAfter.tiles.size).toBeLessThanOrEqual(tilesBefore);
-    expect(s.player.res.gold).toBeGreaterThan(goldBefore - 1); // ganimet geldi
-    expect(compTotal(s.player.units)).toBeGreaterThan(0);      // sağ kalanlar döndü
+    if (kAfter) expect(kAfter.status).toBe('war'); // savaş gerçekleşti
+    expect(s.player.res.gold).toBeGreaterThan(goldBefore); // ganimet geldi
+    expect(compTotal(s.player.units)).toBeGreaterThan(0);  // sağ kalanlar döndü
   });
 
   it('barbar akını orduya/köye zarar verir ama savunma çalışır', () => {
     const { s } = warVillage(11);
-    for (let i = 0; i < 4; i++) s.applyCommand({ kind: 'train', unit: 'spear' });
+    trainMany(s, 'spear', 4);
     expect(s.military.barbarianRaid()).toBe(true);
     expect(s.military.armies.length).toBe(1);
     const popBefore = s.player.pop;
@@ -150,6 +164,7 @@ describe('M4 — Teknoloji', () => {
   it('araştırma bilgi harcar ve üretim çarpanı uygular', () => {
     const { s, p } = warVillage();
     s.applyCommand({ kind: 'place', building: 'academy', x: p.x + 2, y: p.y });
+    completeAll(s);
     s.player.res.know = 100;
     expect(s.tech.prodMult('food', 'farm')).toBe(1);
     expect(s.applyCommand({ kind: 'research', techId: 'plow' })).toBe(true);
@@ -160,6 +175,7 @@ describe('M4 — Teknoloji', () => {
   it('önkoşulsuz araştırma reddedilir (sawmill, plow ister)', () => {
     const { s, p } = warVillage();
     s.applyCommand({ kind: 'place', building: 'academy', x: p.x + 2, y: p.y });
+    completeAll(s);
     s.player.res.know = 500;
     expect(s.applyCommand({ kind: 'research', techId: 'sawmill' })).toBe(false);
     s.applyCommand({ kind: 'research', techId: 'plow' });
@@ -169,6 +185,7 @@ describe('M4 — Teknoloji', () => {
   it('taş ustalığı bina maliyetini düşürür', () => {
     const { s, p } = warVillage();
     s.applyCommand({ kind: 'place', building: 'academy', x: p.x + 2, y: p.y });
+    completeAll(s);
     s.player.res.know = 100;
     s.applyCommand({ kind: 'research', techId: 'masonry' });
     const woodBefore = s.player.res.wood;
@@ -228,8 +245,9 @@ describe('M4 — Kayıt & determinizm (askeri dahil)', () => {
       s.player.res.stone = 450; s.player.res.gold = 450;
       s.applyCommand({ kind: 'place', building: 'barracks', x: p.x + 1, y: p.y });
       s.applyCommand({ kind: 'place', building: 'academy', x: p.x + 2, y: p.y });
+      completeAll(s);
       s.applyCommand({ kind: 'recruitCommander' });
-      for (let i = 0; i < 3; i++) s.applyCommand({ kind: 'train', unit: 'spear' });
+      trainMany(s, 'spear', 3);
       s.player.res.know = 50;
       s.applyCommand({ kind: 'research', techId: 'plow' });
       const k = s.kingdoms.kingdoms[0];
@@ -262,6 +280,7 @@ describe('M4 — Kayıt & determinizm (askeri dahil)', () => {
     s1.applyCommand({ kind: 'place', building: 'center', x: p.x, y: p.y });
     s1.player.res.wood = 400; s1.player.res.stone = 400;
     s1.applyCommand({ kind: 'place', building: 'academy', x: p.x + 1, y: p.y });
+    completeAll(s1);
     s1.player.res.know = 100;
     const saved = JSON.parse(JSON.stringify(s1.serialize()));
     const s2 = Sim.restore(new World(64, 64, 5), saved);
