@@ -2,46 +2,129 @@
    SAHNE ÇİZİMİ — görünür alan taraması + hazır sprite'lar
    Performans ilkeleri (prototipten):
    1. Sadece ekranda görünen karolar taranır
-   2. Karolar hazır sprite (drawImage) ile çizilir
+   2. Karolar/binalar hazır sprite (drawImage) ile çizilir
    3. Çizim sırası: uzaktan yakına (gx+gy köşegenleri)
+   4. Köylüler karo kovalarına konur (karo başına liste taranmaz)
    ============================================================ */
 import type { World } from '../core/world';
+import type { Sim, Building, Villager } from '../core/sim';
+import type { BuildingType } from '../data/buildings';
 import type { ResourceKind } from '../data/biomes';
 import { Camera, TILE_W, TILE_H, type Viewport } from './camera';
 import { shadeBucket, type TileSprite } from './tiles';
+import type { BuildingSprite } from './buildings';
 
 export interface TileSel { gx: number; gy: number; }
+
+export interface Ghost {
+  type: BuildingType;
+  gx: number;
+  gy: number;
+  valid: boolean;
+}
 
 const RES_COLORS: Record<ResourceKind, string> = {
   'balık': '#5ec8e8', 'yiyecek': '#a8e05f', 'at': '#d9b38c', 'odun': '#8a5a2a',
   'altın': '#ffd700', 'taş': '#b0a89a', 'demir': '#c0c8d0', 'mermer': '#f0f0f5',
 };
 
-export interface RenderStats { tiles: number; }
+/* köylü görünümü: isimden deterministik renk (aynı köylü hep aynı) */
+const SHIRT_COLORS = ['#8a5a3a', '#5a7a8a', '#7a8a4a', '#8a4a5a', '#6a5a8a', '#8a7a3a'];
+function nameHash(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
 
-export function drawScene(
-  ctx: CanvasRenderingContext2D,
-  world: World,
-  cam: Camera,
-  view: Viewport,
-  sprites: Map<string, TileSprite>,
-  sel: TileSel | null,
-  stats: RenderStats,
+export interface RenderStats { tiles: number; sprites: number; }
+
+export interface Frame {
+  ctx: CanvasRenderingContext2D;
+  world: World;
+  cam: Camera;
+  view: Viewport;
+  tileSprites: Map<string, TileSprite>;
+  bSprites: Map<BuildingType, BuildingSprite>;
+  sim: Sim | null;
+  sel: TileSel | null;
+  ghost: Ghost | null;
+  /** sim interpolasyon katsayısı 0..1 */
+  alpha: number;
+  stats: RenderStats;
+}
+
+function drawVillager(f: Frame, v: Villager): void {
+  const { ctx, cam, world } = f;
+  const z = cam.zoom;
+  // interpolasyonlu konum
+  const rx = v.px + (v.x - v.px) * f.alpha;
+  const ry = v.py + (v.y - v.py) * f.alpha;
+  const ix = Math.max(0, Math.min(world.W - 1, rx | 0));
+  const iy = Math.max(0, Math.min(world.H - 1, ry | 0));
+  const h = world.height[world.idx(ix, iy)];
+  const c = cam.worldToScreen(rx - 0.5, ry - 0.5, h);
+  const bob = Math.sin(v.bob) * 1.2 * z;
+
+  // gölge
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(c.x, c.y + 1 * z, 3.2 * z, 1.5 * z, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // gövde
+  ctx.fillStyle = SHIRT_COLORS[nameHash(v.name) % SHIRT_COLORS.length];
+  ctx.beginPath();
+  ctx.ellipse(c.x, c.y - 4 * z + bob, 2.6 * z, 4 * z, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // kafa
+  ctx.fillStyle = '#e8c8a0';
+  ctx.beginPath();
+  ctx.arc(c.x, c.y - 9.5 * z + bob, 2.2 * z, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawBuildingSprite(
+  f: Frame, spr: BuildingSprite, gx: number, gy: number, h: number, alpha = 1,
 ): void {
+  const { ctx, cam } = f;
+  const z = cam.zoom;
+  const c = cam.worldToScreen(gx, gy, h);
+  if (alpha < 1) ctx.globalAlpha = alpha;
+  ctx.drawImage(
+    spr.cnv,
+    c.x - (spr.w / 2) * z,
+    c.y - spr.anchorY * z,
+    spr.w * z,
+    spr.h * z,
+  );
+  if (alpha < 1) ctx.globalAlpha = 1;
+  f.stats.sprites++;
+}
+
+function diamondPath(
+  ctx: CanvasRenderingContext2D, x: number, y: number, hw: number, hh: number,
+): void {
+  ctx.beginPath();
+  ctx.moveTo(x, y - hh);
+  ctx.lineTo(x + hw, y);
+  ctx.lineTo(x, y + hh);
+  ctx.lineTo(x - hw, y);
+  ctx.closePath();
+}
+
+export function drawScene(f: Frame): void {
+  const { ctx, world, cam, view, sim } = f;
   ctx.fillStyle = '#0d0a07';
   ctx.fillRect(0, 0, view.w, view.h);
 
   const z = cam.zoom;
   const cssW = view.w / view.dpr, cssH = view.h / view.dpr;
 
-  // görünür karo aralığı: ekran köşelerinin tersine çevrimi + pay
+  // görünür karo aralığı
   const corners = [
-    cam.screenToWorld(0, 0),
-    cam.screenToWorld(cssW, 0),
-    cam.screenToWorld(0, cssH),
-    cam.screenToWorld(cssW, cssH),
+    cam.screenToWorld(0, 0), cam.screenToWorld(cssW, 0),
+    cam.screenToWorld(0, cssH), cam.screenToWorld(cssW, cssH),
   ];
-  const M = 3; // yükseklik/etek payı
+  const M = 3;
   let minGx = Infinity, maxGx = -Infinity, minGy = Infinity, maxGy = -Infinity;
   for (const c of corners) {
     if (c.gx < minGx) minGx = c.gx;
@@ -52,10 +135,26 @@ export function drawScene(
   minGx = Math.max(0, minGx - M); maxGx = Math.min(world.W - 1, maxGx + M);
   minGy = Math.max(0, minGy - M); maxGy = Math.min(world.H - 1, maxGy + M);
 
+  // binalar + köylüler karo kovalarına (yalnız görünür alan için)
+  const bMap = new Map<number, Building>();
+  const vMap = new Map<number, Villager[]>();
+  if (sim) {
+    for (const b of sim.player.buildings) bMap.set(world.idx(b.x, b.y), b);
+    for (const v of sim.villagers) {
+      const ix = v.x | 0, iy = v.y | 0;
+      if (ix < minGx - 1 || ix > maxGx + 1 || iy < minGy - 1 || iy > maxGy + 1) continue;
+      const i = iy * world.W + ix;
+      let arr = vMap.get(i);
+      if (!arr) { arr = []; vMap.set(i, arr); }
+      arr.push(v);
+    }
+  }
+
   let drawn = 0;
+  f.stats.sprites = 0;
   const halfWz = (TILE_W / 2) * z, halfHz = (TILE_H / 2) * z;
 
-  // uzaktan yakına: köşegen (gx+gy) artan sırada
+  // uzaktan yakına: köşegen sırası
   const sMin = minGx + minGy, sMax = maxGx + maxGy;
   for (let s = sMin; s <= sMax; s++) {
     const gxStart = Math.max(minGx, s - maxGy);
@@ -64,19 +163,18 @@ export function drawScene(
       const gy = s - gx;
       const i = world.idx(gx, gy);
       const h = world.height[i];
-      const spr = sprites.get(`${world.tiles[i]}:${shadeBucket(h)}`);
+      const spr = f.tileSprites.get(`${world.tiles[i]}:${shadeBucket(h)}`);
       if (!spr) continue;
       const c = cam.worldToScreen(gx, gy, h);
-      // ekran dışıysa atla (dar kontrol — etek payı dahil)
       if (c.x < -TILE_W * z || c.x > view.w + TILE_W * z) continue;
       if (c.y < -TILE_H * 3 * z || c.y > view.h + TILE_H * 3 * z) continue;
-      // 0.75px taşma: kesirli konumlarda sprite dikişlerini (ince koyu çizgi) örter
+      // 0.75px taşma: kesirli konumlarda sprite dikişlerini örter
       ctx.drawImage(spr.cnv, c.x - halfWz - 0.75, c.y - halfHz - 0.75, spr.w * z + 1.5, spr.h * z + 1.5);
       drawn++;
 
-      // kaynak işareti (yakınlaşınca görünür)
+      // kaynak işareti (yakınlaşınca, bina yoksa)
       const res = world.res[i];
-      if (res !== null && z >= 1.1) {
+      if (res !== null && z >= 1.1 && !bMap.has(i)) {
         ctx.fillStyle = RES_COLORS[res];
         ctx.strokeStyle = 'rgba(0,0,0,0.55)';
         ctx.lineWidth = z;
@@ -85,22 +183,45 @@ export function drawScene(
         ctx.fill();
         ctx.stroke();
       }
+
+      // bina
+      const b = bMap.get(i);
+      if (b) {
+        const bspr = f.bSprites.get(b.type);
+        if (bspr) drawBuildingSprite(f, bspr, gx, gy, h);
+      }
+
+      // bu karodaki köylüler
+      const vs = vMap.get(i);
+      if (vs) for (const v of vs) drawVillager(f, v);
     }
   }
-  stats.tiles = drawn;
+  f.stats.tiles = drawn;
 
-  // seçim vurgusu: altın elmas çerçeve
-  if (sel && world.inBounds(sel.gx, sel.gy)) {
-    const i = world.idx(sel.gx, sel.gy);
-    const c = cam.worldToScreen(sel.gx, sel.gy, world.height[i]);
+  // ---- hayalet (inşa modu) ----
+  if (f.ghost && world.inBounds(f.ghost.gx, f.ghost.gy)) {
+    const gi = world.idx(f.ghost.gx, f.ghost.gy);
+    const gh = world.height[gi];
+    const gc = cam.worldToScreen(f.ghost.gx, f.ghost.gy, gh);
+    // ayak izi
+    diamondPath(ctx, gc.x, gc.y, halfWz, halfHz);
+    ctx.fillStyle = f.ghost.valid ? 'rgba(90,200,90,0.30)' : 'rgba(220,70,50,0.32)';
+    ctx.fill();
+    ctx.strokeStyle = f.ghost.valid ? '#5ac85a' : '#dc4632';
+    ctx.lineWidth = 2 * z;
+    ctx.stroke();
+    // bina önizlemesi
+    const bspr = f.bSprites.get(f.ghost.type);
+    if (bspr) drawBuildingSprite(f, bspr, f.ghost.gx, f.ghost.gy, gh, 0.6);
+  }
+
+  // ---- seçim vurgusu ----
+  if (f.sel && world.inBounds(f.sel.gx, f.sel.gy)) {
+    const i = world.idx(f.sel.gx, f.sel.gy);
+    const c = cam.worldToScreen(f.sel.gx, f.sel.gy, world.height[i]);
+    diamondPath(ctx, c.x, c.y, halfWz, halfHz);
     ctx.strokeStyle = '#d9a441';
     ctx.lineWidth = 2 * z;
-    ctx.beginPath();
-    ctx.moveTo(c.x, c.y - halfHz);
-    ctx.lineTo(c.x + halfWz, c.y);
-    ctx.lineTo(c.x, c.y + halfHz);
-    ctx.lineTo(c.x - halfWz, c.y);
-    ctx.closePath();
     ctx.stroke();
   }
 }

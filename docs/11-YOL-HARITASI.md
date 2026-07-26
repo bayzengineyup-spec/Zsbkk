@@ -15,8 +15,9 @@ Amaç: prototipi modüler, test edilebilir projeye taşımak.
 - [x] RNG + Noise + World üretimini core'a taşı (deterministik testli, 18 test).
 - [x] Render çekirdeği: kamera + izometrik çizim + minimap. *(M1: Canvas2D sprite; WebGL atlas sprite sayısı artınca)*
 - [x] Dokunmatik input porta (atalet, pinch, çift dokunuş, uzun basma).
-- [ ] Ekonomi + köylü + olay + diplomasi + savaş çekirdeğini modüllere böl. **← M2, buradayız**
-- [ ] Veri dosyaları: buildings/units/techs/events ayrı veri modüllerine. *(biomes taşındı)*
+- [ ] Ekonomi + köylü + olay + diplomasi + savaş çekirdeğini modüllere böl.
+      *(M2 ✓: ekonomi+köylü+mevsim, komut deseniyle · M3 ←: olaylar, krallıklar/diplomasi, sis, kayıt · M4: askeri, teknoloji, zafer)*
+- [ ] Veri dosyaları: buildings/units/techs/events ayrı veri modüllerine. *(biomes+buildings+seasons+names taşındı)*
 - [x] Bilinen bug'lar: tekrarlı `#rail` butonları — yeni arayüzde yok.
 - **Bitti kriteri:** prototiple aynı oyun, artık modüler + testli çalışıyor.
 

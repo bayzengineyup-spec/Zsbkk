@@ -4,12 +4,32 @@
 > her oturum sonunda güncellenir. "Neredeydik, ne yaptık, sırada ne var?"
 
 ## 📍 Şu an
-- **Aşama:** **Faz 0 — M1 tamamlandı** (Dünya Gezgini çalışıyor). Sırada M2:
-  oyun sistemlerinin (ekonomi/köylü/olay/diplomasi/savaş) modüllere taşınması.
-- **Sürüm:** v0.6-M1 (modüler) · referans: `prototype/kralliklar-cagi-v0.5.html`.
+- **Aşama:** **Faz 0 — M2 tamamlandı** (Köy Kurma çalışıyor). Sırada M3:
+  olay/felaket sistemi + krallıklar/diplomasi + sis + kayıt portu.
+- **Sürüm:** v0.6-M2 (modüler) · referans: `prototype/kralliklar-cagi-v0.5.html`.
 - **Son güncelleme:** 2026-07-26 (2. oturum).
 
 ## ✅ Tamamlanan
+### Faz 0 · M2 — Köy Kurma (2. oturum, devam)
+- **Komut deseni kuruldu:** UI sim'i asla doğrudan değiştirmez —
+  `core/commands.ts` → `Sim.applyCommand` (place/assign/upgradeCenter/demolish).
+  Kayıt/replay/çok oyunculu temeli.
+- **Sim çekirdeği (`core/sim.ts`):** ekonomi tick (üretim×işçi×seviye×mutluluk
+  ×mevsim), tüketim, açlık ölümü, nüfus artışı, mutluluk hedefi, mevsim/yıl +
+  hasat bonusu, köylü hareketi (iş çevresi/merkez dolaşımı) — hepsi prototipten
+  birebir, hepsi tohumlu RNG ile deterministik. Olaylar `drainEvents` kuyruğuyla
+  UI'ya akar (sim DOM bilmez).
+- **Veri modülleri:** buildings (11 bina + maliyet/üretim/kurallar), seasons,
+  names — saf veri.
+- **İnşa akışı:** panel → hayalet (geçerli yeşil / geçersiz kırmızı) → Kur/İptal;
+  kurulabilirlik kuralları (su/dolu karo/near_wood/near_stone/fertile/near_gold).
+- **Render:** yer tutucu prosedürel bina sprite'ları (11 tip, ayırt edilebilir),
+  köylü çizimi (isimden deterministik renk, bob animasyonu, interpolasyonlu),
+  karo kovaları, hayalet önizleme.
+- **UI:** kaynak HUD'u, bina bilgi kartı (işçi +/−, yükselt, yık), toast, ipucu.
+- **Testler: 31/31 yeşil** (13 yeni sim testi: yerleştirme kuralları, işçi,
+  üretim/açlık, yükseltme/yıkım, **komut determinizmi**, mevsim döngüsü).
+- Duman testi: meydan+ev kuruldu, 5 köylü dolaşıyor, 60 fps, sıfır hata.
 ### Faz 0 · M1 — Dünya Gezgini (2. oturum)
 - Vite + TypeScript (strict) + Vitest iskeleti; `npm run dev/build/test/lint`.
 - Klasör yapısı: `src/core` (saf sim), `src/render`, `src/ui`, `src/data`, `src/test`.
@@ -37,16 +57,18 @@
 - Master plan yazıldı: `docs/00`…`docs/12` + bu DURUM dosyası.
 - Prototip repoya alındı (`prototype/`).
 
-## 🔜 Sıradaki adım (Faz 0 · M2)
-1. Bina/oyuncu durumu + ekonomi tick'ini `core`'a taşı (komut deseniyle:
-   UI → Command → sim; docs/01-MIMARI kuralı).
-2. İnşa modu + bina yerleştirme UI'ı (hayalet, geçerlilik kuralları).
-3. Köylüler (görünür bireyler) + iş atama.
-4. Mevsim/zaman + olay sistemi portu.
-5. Sonra: diplomasi/krallıklar, savaş, sis, kayıt.
-- Not: Karo görselleri şimdilik düz sprite (bilinçli) — gerçek dokular Faz 2'de.
+## 🔜 Sıradaki adım (Faz 0 · M3)
+1. Olay/felaket sistemi portu (koşullu yangın/veba/deprem/fırtına + iyi olaylar;
+   yangın yayılma/söndürme).
+2. AI krallıklar + diplomasi portu (kişilikler, büyüme, ilişki, elçi).
+3. Sis (keşif) sistemi portu.
+4. Kayıt/yükleme (yeni format: tohum + durum; IndexedDB Faz 3'te, önce
+   localStorage MVP).
+5. Sonra: askeri sistem, teknoloji, zafer/yenilgi → Faz 0 biter.
+- Not: Görseller (karo + bina) bilinçli yer tutucu — **gerçek dokular Faz 2'de
+  her öğe için ayrı ayrı üretilecek** (kullanıcının açık talebi).
 - Not: WebGL atlas motoru henüz taşınmadı; Canvas2D sprite yolu 60 fps veriyor,
-  WebGL'e sprite sayısı artınca geçilecek.
+  sprite sayısı artınca geçilecek.
 
 ## 🧠 Karar günlüğü (neden böyle?)
 - **HTML prototipi temel alındı** çünkü gerçek WebGL grafik motoru ve canlı
@@ -63,6 +85,11 @@
 - Ekonomi zinciri kaç adım derin olacak.
 
 ## 📝 Oturum notları
+- **2026-07-26 (2b):** Faz 0 M2 bitti — komut desenli sim çekirdeği (ekonomi,
+  köylüler, mevsim), inşa akışı (hayalet+kurallar), yer tutucu bina/köylü
+  render'ı, HUD/toast. 31 test yeşil, duman testi 60 fps.
+  Kullanıcı notu kayda geçti: **dokular her şey için ayrı ayrı üretilecek
+  (ileride, Faz 2'de — şimdilik yer tutucu bilinçli tercih).**
 - **2026-07-26 (2):** Faz 0 M1 bitti — modüler iskelet + deterministik dünya
   üretimi (testli) + izometrik render + dokunmatik kamera. Duman testi 60 fps.
   Eski React iskeleti kaldırıldı; görsel yol haritası eklendi (docs/yol-haritasi.html).

@@ -30,21 +30,23 @@
   /* ---- üst şerit ---- */
   #topbar {
     position: fixed; top: 0; left: 0; right: 0; height: 44px;
-    display: flex; align-items: center; gap: 8px; padding: 0 10px;
+    display: flex; align-items: center; gap: 5px; padding: 0 8px;
     background: linear-gradient(180deg, rgba(26,20,16,0.95), rgba(26,20,16,0.78));
     border-bottom: 1px solid var(--panel-edge);
     backdrop-filter: blur(4px); z-index: 20;
+    overflow-x: auto; scrollbar-width: none;
   }
+  #topbar::-webkit-scrollbar { display: none; }
   .brand {
     font-weight: bold; letter-spacing: 0.5px; color: var(--gold);
-    font-size: 14px; margin-right: auto; text-shadow: 0 1px 2px #000;
+    font-size: 13px; margin-right: auto; text-shadow: 0 1px 2px #000; white-space: nowrap;
   }
-  .brand small { color: var(--ink-dim); font-weight: normal; font-size: 10px; margin-left: 5px; }
-  .chip {
-    font-size: 11px; padding: 3px 9px; border-radius: 6px; white-space: nowrap;
+  .stat {
+    display: flex; align-items: center; gap: 3px;
+    font-size: 11.5px; padding: 3px 7px; border-radius: 6px; white-space: nowrap;
     background: rgba(0,0,0,0.35); border: 1px solid var(--panel-edge); color: var(--ink-dim);
   }
-  .chip b { color: var(--ink); font-weight: 600; }
+  .stat b { color: var(--ink); font-weight: 600; }
 
   /* ---- mini harita ---- */
   #minimap {
@@ -56,32 +58,107 @@
 
   /* ---- karo bilgi kartı ---- */
   #tileinfo {
-    position: fixed; left: 8px; bottom: 64px; z-index: 15;
-    background: rgba(26,20,16,0.93); border: 1px solid var(--panel-edge);
-    border-radius: 10px; padding: 9px 12px; font-size: 12px; min-width: 138px;
+    position: fixed; left: 8px; bottom: 70px; z-index: 15;
+    background: rgba(26,20,16,0.94); border: 1px solid var(--panel-edge);
+    border-radius: 10px; padding: 9px 12px; font-size: 12px; min-width: 158px; max-width: 220px;
     display: none; box-shadow: 0 4px 16px rgba(0,0,0,0.5);
   }
   #tileinfo.show { display: block; }
   #tileinfo h4 { color: var(--gold); font-size: 13px; margin-bottom: 4px; }
   #tileinfo .line { color: var(--ink-dim); margin: 1px 0; }
   #tileinfo .line b { color: var(--ink); }
+  #ti-act { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+  #ti-act button {
+    font-family: inherit; font-size: 11.5px; padding: 7px 10px; border-radius: 7px;
+    border: 1px solid var(--panel-edge); background: #241a10; color: var(--ink);
+    cursor: pointer; min-height: 34px;
+  }
+  #ti-act button:disabled { opacity: 0.4; }
+  #ti-act button.danger { border-color: #5a2c20; color: #e0a090; }
 
   /* ---- alt şerit ---- */
   #bottombar {
     position: fixed; bottom: 0; left: 0; right: 0;
-    display: flex; gap: 8px; padding: 8px 10px 12px; justify-content: center;
+    display: flex; gap: 6px; padding: 8px 10px 12px; justify-content: center;
     background: linear-gradient(0deg, rgba(26,20,16,0.95), rgba(26,20,16,0));
     z-index: 20;
   }
   .btn {
-    min-height: 42px; padding: 8px 16px;
+    min-width: 60px; min-height: 46px; padding: 4px 10px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
     background: var(--panel); border: 1px solid var(--panel-edge);
-    border-radius: 10px; color: var(--ink); font-size: 12px; cursor: pointer;
+    border-radius: 10px; color: var(--ink); font-size: 11px; cursor: pointer;
     font-family: inherit;
-    transition: transform .08s, border-color .15s;
+    transition: transform .08s, border-color .15s, background .15s;
   }
   .btn:active { transform: translateY(1px) scale(0.97); }
-  .btn.gold { border-color: var(--gold-dim); color: var(--gold); }
+  .btn.on { border-color: var(--gold); background: #241a10; color: var(--gold); }
+  .btn .ic { font-size: 17px; line-height: 1; }
+
+  /* ---- inşa paneli ---- */
+  #buildpanel {
+    position: fixed; left: 8px; right: 8px; bottom: 74px; z-index: 19;
+    background: rgba(20,15,11,0.97); border: 1px solid var(--panel-edge);
+    border-radius: 12px; padding: 10px; display: none;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.6); max-height: 52vh; overflow-y: auto;
+  }
+  #buildpanel.show { display: block; }
+  #buildpanel h3 {
+    font-size: 11px; color: var(--gold); text-transform: uppercase;
+    letter-spacing: 0.5px; margin: 2px 4px 9px;
+  }
+  .bgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 7px; }
+  .bcard {
+    background: var(--panel); border: 1px solid var(--panel-edge);
+    border-radius: 9px; padding: 8px; cursor: pointer; text-align: center;
+    transition: border-color .15s;
+  }
+  .bcard .bic { font-size: 20px; }
+  .bcard .bnm { font-size: 11px; margin: 3px 0 2px; }
+  .bcard .bcost { font-size: 9.5px; color: var(--ink-dim); }
+  .bcard.poor { opacity: 0.45; }
+  .bcard:active { border-color: var(--gold); }
+
+  /* ---- yerleştirme çubuğu ---- */
+  #placebar {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 74px; z-index: 21;
+    display: none; align-items: center; gap: 8px;
+    background: rgba(20,15,11,0.97); border: 1px solid var(--panel-edge);
+    border-radius: 12px; padding: 8px 10px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.6); white-space: nowrap;
+  }
+  #placebar.show { display: flex; }
+  #placebar .pinfo { font-size: 12px; }
+  #placebar .pinfo span { color: var(--ink-dim); font-size: 11px; }
+  #placebar button {
+    font-family: inherit; font-size: 12.5px; padding: 9px 14px; border-radius: 8px;
+    border: 1px solid var(--panel-edge); background: #241a10; color: var(--ink); cursor: pointer;
+  }
+  #placebar button#pb-ok { background: var(--gold-dim); border-color: var(--gold); color: #1a1207; font-weight: bold; }
+  #placebar button#pb-ok:disabled { opacity: 0.45; }
+
+  /* ---- ipucu ---- */
+  .hint {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 130px; z-index: 16;
+    background: rgba(0,0,0,0.55); padding: 6px 12px; border-radius: 20px;
+    font-size: 11px; color: var(--ink-dim); pointer-events: none;
+    transition: opacity .5s; opacity: 0;
+  }
+  .hint.show { opacity: 1; }
+
+  /* ---- bildirimler ---- */
+  #toasts {
+    position: fixed; top: 52px; left: 50%; transform: translateX(-50%);
+    z-index: 30; display: flex; flex-direction: column; gap: 5px; align-items: center;
+    pointer-events: none; width: max-content; max-width: 90vw;
+  }
+  .toast {
+    background: rgba(26,20,16,0.95); border: 1px solid var(--panel-edge);
+    border-radius: 8px; padding: 7px 13px; font-size: 12px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5); max-width: 90vw;
+  }
+  .toast.good { border-color: #3f6b3a; }
+  .toast.bad { border-color: #6b3a30; }
 
   /* ---- açılış ekranı ---- */
   #boot {
@@ -111,29 +188,52 @@
 <div id="game"><canvas id="cv"></canvas></div>
 
 <div id="topbar">
-  <div class="brand">Krallıklar Çağı <small>v0.6 · M1</small></div>
-  <div class="chip">Tohum <b id="hud-seed">—</b></div>
-  <div class="chip"><b id="hud-fps">—</b> fps</div>
+  <div class="brand">Krallıklar Çağı</div>
+  <div class="stat" title="Yiyecek">🍞 <b id="r-food">0</b></div>
+  <div class="stat" title="Odun">🪵 <b id="r-wood">0</b></div>
+  <div class="stat" title="Taş">🪨 <b id="r-stone">0</b></div>
+  <div class="stat" title="Altın">🪙 <b id="r-gold">0</b></div>
+  <div class="stat" title="Nüfus / Kapasite">👥 <b id="r-pop">0/0</b></div>
+  <div class="stat" title="Mutluluk">😊 <b id="r-happy">—</b></div>
+  <div class="stat" title="Mevsim"><b id="r-season">—</b></div>
+  <div class="stat" title="FPS"><b id="hud-fps">—</b></div>
 </div>
 
 <canvas id="minimap" width="132" height="132"></canvas>
 
 <div id="tileinfo">
   <h4 id="ti-name">—</h4>
-  <div class="line">Konum: <b id="ti-xy">—</b></div>
-  <div class="line">Yükseklik: <b id="ti-h">—</b></div>
-  <div class="line">Kaynak: <b id="ti-res">—</b></div>
+  <div class="line" id="ti-l1"></div>
+  <div class="line" id="ti-l2"></div>
+  <div class="line" id="ti-l3"></div>
+  <div id="ti-act"></div>
 </div>
 
+<div id="buildpanel">
+  <h3>İnşa Et</h3>
+  <div class="bgrid" id="bgrid"></div>
+</div>
+
+<div id="placebar">
+  <div class="pinfo"><b id="pb-name">—</b> · <span id="pb-status">yer seç</span></div>
+  <button id="pb-ok" disabled>Kur</button>
+  <button id="pb-cancel">İptal</button>
+</div>
+
+<div class="hint" id="hint"></div>
+<div id="toasts"></div>
+
 <div id="bottombar">
-  <button class="btn" id="b-center">🎯 Ortala</button>
-  <button class="btn gold" id="b-new">🌍 Yeni Dünya</button>
+  <div class="btn on" id="b-explore"><span class="ic">🧭</span>Keşif</div>
+  <div class="btn" id="b-build"><span class="ic">🏠</span>İnşa</div>
+  <div class="btn" id="b-center"><span class="ic">🎯</span>Merkez</div>
+  <div class="btn" id="b-new"><span class="ic">🌍</span>Yeni</div>
 </div>
 
 <div id="boot">
-  <span class="m1">Faz 0 · Kilometre Taşı 1 — Dünya Gezgini</span>
+  <span class="m1">Faz 0 · M2 — Köy Kurma</span>
   <h1>Krallıklar Çağı</h1>
-  <p>Modüler motorun ilk çalışan sürümü: tohumdan üretilen dünya, izometrik görünüm, dokunmatik kamera. Oyun sistemleri adım adım bu temele taşınıyor.</p>
+  <p>Köy meydanını kur, kaynak topla, halkını büyüt. Modüler motor: deterministik simülasyon + komut sistemi çalışıyor.</p>
   <div class="ctl">
     <select id="opt-size">
       <option value="128">Küçük · 128</option>

@@ -1,15 +1,19 @@
 /* ============================================================
-   ÖNYÜKLEME + OYUN DÖNGÜSÜ (M1 — Dünya Gezgini)
+   ÖNYÜKLEME + OYUN DÖNGÜSÜ (M2 — Köy Kurma)
    Katman kuralı: core hiçbir DOM bilmez; render core'u okur;
-   input komut/kamera üretir. (docs/01-MIMARI)
+   UI komut üretir → sim uygular (docs/01-MIMARI).
    ============================================================ */
 import { World } from './core/world';
+import { Sim } from './core/sim';
 import { BIOMES } from './data/biomes';
+import { BUILDINGS, costStr, type BuildingType } from './data/buildings';
 import { Camera, type Viewport } from './render/camera';
 import { buildTileSprites } from './render/tiles';
-import { drawScene, type RenderStats, type TileSel } from './render/scene';
+import { buildBuildingSprites } from './render/buildings';
+import { drawScene, type Frame, type Ghost, type RenderStats, type TileSel } from './render/scene';
 import { buildMinimapCache, drawMinimap } from './render/minimap';
 import { TouchInput } from './ui/input';
+import { initToasts, toast } from './ui/toast';
 
 function el<T extends HTMLElement>(id: string): T {
   const e = document.getElementById(id);
@@ -41,30 +45,195 @@ resize();
 
 // ---------- durum ----------
 const cam = new Camera(view);
-const sprites = buildTileSprites();
+const tileSprites = buildTileSprites();
+const bSprites = buildBuildingSprites();
 let world: World | null = null;
+let sim: Sim | null = null;
 let mmCache: HTMLCanvasElement | null = null;
 let sel: TileSel | null = null;
-const stats: RenderStats = { tiles: 0 };
+let ghost: Ghost | null = null;
+const stats: RenderStats = { tiles: 0, sprites: 0 };
+
+initToasts(el('toasts'));
+
+// ---------- ipucu ----------
+const hintEl = el<HTMLElement>('hint');
+function hint(msg: string | null): void {
+  if (msg) { hintEl.textContent = msg; hintEl.classList.add('show'); }
+  else hintEl.classList.remove('show');
+}
 
 // ---------- HUD ----------
-const hudSeed = el<HTMLElement>('hud-seed');
-const hudFps = el<HTMLElement>('hud-fps');
-const tileinfo = el<HTMLElement>('tileinfo');
-const tiName = el<HTMLElement>('ti-name');
-const tiXy = el<HTMLElement>('ti-xy');
-const tiH = el<HTMLElement>('ti-h');
-const tiRes = el<HTMLElement>('ti-res');
+function refreshHUD(): void {
+  if (!sim) return;
+  const p = sim.player;
+  el('r-food').textContent = String(Math.floor(p.res.food));
+  el('r-wood').textContent = String(Math.floor(p.res.wood));
+  el('r-stone').textContent = String(Math.floor(p.res.stone));
+  el('r-gold').textContent = String(Math.floor(p.res.gold));
+  el('r-pop').textContent = `${p.pop}/${p.popCap}`;
+  el('r-happy').textContent = `%${Math.round(p.happy)}`;
+  const s = sim.currentSeason();
+  el('r-season').textContent = `${s.icon} ${s.name} · ${sim.time.year}. yıl`;
+}
 
-function showTileInfo(gx: number, gy: number): void {
-  if (!world || !world.inBounds(gx, gy)) { tileinfo.classList.remove('show'); return; }
+// ---------- karo bilgi kartı ----------
+const tileinfo = el<HTMLElement>('tileinfo');
+
+function hideInfo(): void {
+  sel = null;
+  tileinfo.classList.remove('show');
+}
+
+function refreshTileInfo(): void {
+  if (!world || !sel || !world.inBounds(sel.gx, sel.gy)) { tileinfo.classList.remove('show'); return; }
+  const { gx, gy } = sel;
   const i = world.idx(gx, gy);
-  tiName.textContent = BIOMES[world.tiles[i]].name;
-  tiXy.textContent = `${gx}, ${gy}`;
-  tiH.textContent = world.height[i].toFixed(2);
-  tiRes.textContent = world.res[i] ?? '—';
+  const act = el<HTMLElement>('ti-act');
+  const b = sim?.buildingAt(gx, gy) ?? null;
+
+  if (b && sim) {
+    const def = BUILDINGS[b.type];
+    el('ti-name').textContent = `${def.icon} ${def.name} · sv ${b.level}`;
+    el('ti-l1').textContent = def.desc;
+    el('ti-l2').textContent = def.maxWorkers
+      ? `İşçi: ${b.workers}/${def.maxWorkers} · Boşta: ${sim.player.idle}`
+      : '';
+    el('ti-l3').textContent = '';
+    act.innerHTML = '';
+    act.style.display = 'flex';
+
+    if (def.maxWorkers > 0) {
+      const minus = document.createElement('button');
+      minus.textContent = '− işçi';
+      minus.disabled = b.workers <= 0;
+      minus.onclick = () => { sim!.applyCommand({ kind: 'assign', x: gx, y: gy, delta: -1 }); refreshTileInfo(); refreshHUD(); };
+      const plus = document.createElement('button');
+      plus.textContent = '+ işçi';
+      plus.disabled = sim.player.idle <= 0 || b.workers >= def.maxWorkers;
+      plus.onclick = () => { sim!.applyCommand({ kind: 'assign', x: gx, y: gy, delta: 1 }); refreshTileInfo(); refreshHUD(); };
+      act.append(minus, plus);
+    }
+    if (b.type === 'center') {
+      const ups = BUILDINGS.center.upgrade!;
+      if (b.level - 1 < ups.length) {
+        const up = document.createElement('button');
+        up.textContent = `⬆ Yükselt (${costStr(ups[b.level - 1].cost)})`;
+        up.disabled = !sim.canAfford(ups[b.level - 1].cost);
+        up.onclick = () => { sim!.applyCommand({ kind: 'upgradeCenter', x: gx, y: gy }); refreshTileInfo(); refreshHUD(); };
+        act.append(up);
+      }
+    } else {
+      const dem = document.createElement('button');
+      dem.className = 'danger';
+      dem.textContent = '🗑 Yık';
+      dem.onclick = () => { sim!.applyCommand({ kind: 'demolish', x: gx, y: gy }); hideInfo(); refreshHUD(); };
+      act.append(dem);
+    }
+  } else {
+    el('ti-name').textContent = BIOMES[world.tiles[i]].name;
+    el('ti-l1').textContent = `Konum: ${gx}, ${gy}`;
+    el('ti-l2').textContent = `Yükseklik: ${world.height[i].toFixed(2)}`;
+    el('ti-l3').textContent = `Kaynak: ${world.res[i] ?? '—'}`;
+    el<HTMLElement>('ti-act').style.display = 'none';
+  }
   tileinfo.classList.add('show');
 }
+
+// ---------- inşa paneli ----------
+const buildpanel = el<HTMLElement>('buildpanel');
+const bBuild = el<HTMLElement>('b-build');
+
+function openBuildPanel(): void {
+  if (!sim) return;
+  const grid = el<HTMLElement>('bgrid');
+  grid.innerHTML = '';
+  for (const type of Object.keys(BUILDINGS) as BuildingType[]) {
+    const def = BUILDINGS[type];
+    if (def.unique && sim.player.buildings.some(x => x.type === type)) continue;
+    // merkez yoksa önce merkez
+    if (!sim.player.hasCenter && type !== 'center') continue;
+    const afford = sim.canAfford(def.cost);
+    const card = document.createElement('div');
+    card.className = 'bcard' + (afford ? '' : ' poor');
+    card.innerHTML = `<div class="bic">${def.icon}</div>`
+      + `<div class="bnm">${def.name}</div>`
+      + `<div class="bcost">${costStr(def.cost)}</div>`;
+    card.title = def.desc;
+    card.onclick = () => {
+      if (!sim!.canAfford(def.cost)) { toast('Yeterli kaynak yok.', 'bad'); return; }
+      enterPlace(type);
+      closeBuildPanel();
+    };
+    grid.appendChild(card);
+  }
+  buildpanel.classList.add('show');
+  bBuild.classList.add('on');
+}
+function closeBuildPanel(): void {
+  buildpanel.classList.remove('show');
+  bBuild.classList.remove('on');
+}
+
+// ---------- yerleştirme modu ----------
+const placebar = el<HTMLElement>('placebar');
+
+function enterPlace(type: BuildingType): void {
+  if (!world) return;
+  hideInfo();
+  // hayalet: ekran ortasındaki karo
+  const c = cam.screenToWorld(innerWidth / 2, innerHeight / 2);
+  const gx = Math.max(0, Math.min(world.W - 1, c.gx));
+  const gy = Math.max(0, Math.min(world.H - 1, c.gy));
+  ghost = { type, gx, gy, valid: false };
+  updateGhostValidity();
+  el('pb-name').textContent = `${BUILDINGS[type].icon} ${BUILDINGS[type].name}`;
+  placebar.classList.add('show');
+  hint('Yer seçmek için haritaya dokun');
+}
+
+function updateGhostValidity(): void {
+  if (!ghost || !sim) return;
+  const def = BUILDINGS[ghost.type];
+  const placeOk = sim.canPlaceOn(ghost.type, ghost.gx, ghost.gy);
+  const afford = sim.canAfford(def.cost);
+  ghost.valid = placeOk && afford;
+  const status = el<HTMLElement>('pb-status');
+  const ok = el<HTMLButtonElement>('pb-ok');
+  if (!placeOk) status.textContent = 'buraya kurulamaz';
+  else if (!afford) status.textContent = 'kaynak yetersiz';
+  else status.textContent = 'hazır';
+  ok.disabled = !ghost.valid;
+}
+
+function confirmPlace(): void {
+  if (!ghost || !sim) return;
+  const wasCenter = ghost.type === 'center';
+  const okPlaced = sim.applyCommand({ kind: 'place', building: ghost.type, x: ghost.gx, y: ghost.gy });
+  if (okPlaced) {
+    cancelPlace();
+    if (wasCenter) hint(null);
+    refreshHUD();
+  } else {
+    updateGhostValidity();
+  }
+}
+
+function cancelPlace(): void {
+  ghost = null;
+  placebar.classList.remove('show');
+  hint(null);
+}
+
+el<HTMLButtonElement>('pb-ok').onclick = confirmPlace;
+el<HTMLButtonElement>('pb-cancel').onclick = () => {
+  const wasCenter = ghost?.type === 'center';
+  cancelPlace();
+  // merkez hâlâ yoksa yerleştirme şart — ipucunu koru
+  if (wasCenter && sim && !sim.player.hasCenter) {
+    hint('Köy kurmak için önce Köy Meydanı gerekli — İnşa menüsünden seç');
+  }
+};
 
 // ---------- girdi ----------
 function haptic(ms: number): void {
@@ -76,12 +245,14 @@ const input = new TouchInput(cv, cam, view, () => world, {
   onSelect(clientX, clientY) {
     if (!world) return;
     const g = cam.screenToWorld(clientX, clientY);
-    if (world.inBounds(g.gx, g.gy)) {
-      sel = { gx: g.gx, gy: g.gy };
-      showTileInfo(g.gx, g.gy);
+    if (!world.inBounds(g.gx, g.gy)) { if (!ghost) hideInfo(); return; }
+    if (ghost) {
+      // yerleştirme modunda: hayaleti taşı
+      ghost.gx = g.gx; ghost.gy = g.gy;
+      updateGhostValidity();
     } else {
-      sel = null;
-      tileinfo.classList.remove('show');
+      sel = { gx: g.gx, gy: g.gy };
+      refreshTileInfo();
     }
   },
 });
@@ -100,42 +271,57 @@ mm.addEventListener('pointerdown', (e) => {
   haptic(10);
 });
 
+// ---------- alt şerit ----------
+el('b-explore').onclick = () => { cancelPlace(); closeBuildPanel(); };
+bBuild.onclick = () => {
+  if (buildpanel.classList.contains('show')) closeBuildPanel();
+  else { cancelPlace(); openBuildPanel(); }
+};
+el('b-center').onclick = () => {
+  if (!world || !sim) return;
+  const c = sim.villageCenter();
+  cam.focusOn(c.x, c.y, world);
+  haptic(10);
+};
+el('b-new').onclick = () => {
+  el('boot').style.display = 'flex';
+  world = null; sim = null; mmCache = null;
+  cancelPlace(); closeBuildPanel(); hideInfo();
+};
+
 // ---------- dünya kurulumu ----------
 function startGame(size: number): void {
   const loadmsg = el<HTMLElement>('loadmsg');
   loadmsg.style.display = 'block';
-  // ağır işi bir sonraki karede yap (ekran donmasın)
   setTimeout(() => {
-    const seed = (Math.random() * 1e9) | 0; // yalnız dünya tohumu üretimi — sim dışı
+    const seed = (Math.random() * 1e9) | 0; // yalnız tohum üretimi — sim dışı
     world = new World(size, size, seed);
+    sim = new Sim(world);
     mmCache = buildMinimapCache(world);
-    sel = null;
-    tileinfo.classList.remove('show');
-    hudSeed.textContent = String(seed);
-    el<HTMLElement>('opt-seed').textContent = String(seed);
+    sel = null; ghost = null;
+    hideInfo();
+    el('opt-seed').textContent = String(seed);
     cam.zoom = 1.1;
     cam.x = 0; cam.y = 0;
     cam.focusOn(size / 2, size / 2, world);
-    el<HTMLElement>('boot').style.display = 'none';
+    el('boot').style.display = 'none';
     loadmsg.style.display = 'none';
+    refreshHUD();
+    // ilk görev: köy meydanı yerleştir
+    enterPlace('center');
+    hint('Köy meydanını kurmak için bir yer seç');
   }, 30);
 }
 
 el<HTMLButtonElement>('opt-play').onclick = () => {
   startGame(parseInt(el<HTMLSelectElement>('opt-size').value, 10));
 };
-el<HTMLButtonElement>('b-new').onclick = () => {
-  el<HTMLElement>('boot').style.display = 'flex';
-  world = null; mmCache = null;
-  tileinfo.classList.remove('show');
-};
-el<HTMLButtonElement>('b-center').onclick = () => {
-  if (world) { cam.focusOn(world.W / 2, world.H / 2, world); haptic(10); }
-};
 
 // ---------- döngü ----------
+const SIM_HZ = 10, SIM_STEP = 1 / SIM_HZ;
+let simAcc = 0;
 let lastT = 0;
-let fpsFrames = 0, fpsAcc = 0;
+let fpsFrames = 0, fpsAcc = 0, hudAcc = 0;
 
 function loop(t: number): void {
   if (!lastT) lastT = t;
@@ -144,15 +330,36 @@ function loop(t: number): void {
   if (!isFinite(dt) || dt < 0) dt = 0;
   if (dt > 0.25) dt = 0.25;
 
-  if (world && mmCache) {
+  let alpha = 1;
+  if (sim && world && mmCache) {
+    // sabit zaman adımı — determinizmin şartı
+    simAcc += dt;
+    let guard = 0;
+    while (simAcc >= SIM_STEP && guard < 5) { sim.tick(SIM_STEP); simAcc -= SIM_STEP; guard++; }
+    if (guard >= 5) simAcc = 0;
+    alpha = Math.max(0, Math.min(1, simAcc / SIM_STEP));
+
+    // sim olaylarını bildirime çevir
+    for (const ev of sim.drainEvents()) toast(ev.msg, ev.kind);
+
     input.applyMomentum(dt);
-    drawScene(ctx, world, cam, view, sprites, sel, stats);
+    if (ghost) updateGhostValidity();
+
+    const frame: Frame = {
+      ctx, world, cam, view,
+      tileSprites, bSprites,
+      sim, sel, ghost, alpha, stats,
+    };
+    drawScene(frame);
     drawMinimap(mmx, mmCache, world, cam, view);
+
+    hudAcc += dt;
+    if (hudAcc >= 0.25) { hudAcc = 0; refreshHUD(); }
   }
 
   fpsFrames++; fpsAcc += dt;
   if (fpsAcc >= 0.5) {
-    hudFps.textContent = String(Math.round(fpsFrames / fpsAcc));
+    el('hud-fps').textContent = `${Math.round(fpsFrames / fpsAcc)} fps`;
     fpsFrames = 0; fpsAcc = 0;
   }
   requestAnimationFrame(loop);
