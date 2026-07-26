@@ -9,7 +9,7 @@ import { BIOMES } from './data/biomes';
 import { BUILDINGS, costStr, upgradeCost, upgradeTime, type BuildingType } from './data/buildings';
 import { Camera, type Viewport } from './render/camera';
 import { buildTileSprites, buildTreeSprites } from './render/tiles';
-import { buildBuildingSprites } from './render/buildings';
+import { buildBuildingSprites, buildCapitalSprite } from './render/buildings';
 import { drawScene, type Frame, type Ghost, type RenderStats, type TileSel } from './render/scene';
 import { MiniMap } from './render/minimap';
 import { TouchInput } from './ui/input';
@@ -66,6 +66,8 @@ const cam = new Camera(view);
 const tileSprites = buildTileSprites();
 const bSpritesDay = buildBuildingSprites(false);
 const bSpritesNight = buildBuildingSprites(true); // pencereler ışıklı
+const capDay = buildCapitalSprite(false);
+const capNight = buildCapitalSprite(true);
 const treeSprites = buildTreeSprites();
 let world: World | null = null;
 let sim: Sim | null = null;
@@ -698,11 +700,13 @@ function loop(t: number): void {
     input.applyMomentum(dt);
     if (ghost) updateGhostValidity();
 
+    const night = dayLight(sim.time.t) < 0.35;
     const frame: Frame = {
       ctx, world, cam, view,
       tileSprites,
-      bSprites: dayLight(sim.time.t) < 0.35 ? bSpritesNight : bSpritesDay,
+      bSprites: night ? bSpritesNight : bSpritesDay,
       treeSprites,
+      capSprite: night ? capNight : capDay,
       sim, sel, ghost, alpha, t: renderT, stats,
     };
     drawScene(frame);

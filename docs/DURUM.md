@@ -4,18 +4,43 @@
 > her oturum sonunda güncellenir. "Neredeydik, ne yaptık, sırada ne var?"
 
 ## 📍 Şu an
-- **Aşama:** **FAZ 2 · M1 TAMAMLANDI** — kullanıcının onayladığı gerçekçi
-  sanat yönü (docs/concepts/stil-mockup2.html, "Bunlar baya iyi bunları seç")
-  motora işlendi: karo/bina/ağaç/köylü sprite'ları + parşömen-ahşap arayüz.
-  Sırada: Faz 2 M2 (hayvan/ordu/kervan/başkent sprite yenileme + animasyon
-  durum makineleri) veya Faz 3 (kayıt genişletme).
-- **Sürüm:** v0.7 (Faz 2 M1) · referans: `prototype/kralliklar-cagi-v0.5.html`.
+- **Aşama:** **FAZ 2 · M2 TAMAMLANDI** — görsel yenileme tüm dünya
+  nesnelerine yayıldı: hayvanlar/askerler/kervanlar/AI başkentleri v2 +
+  canlı ayrıntılar (baca dumanı, dönen değirmen kanadı, dalgalanan
+  bayraklar). Arazi kesintisiz zemin + biyom kenarı yumuşatma ile
+  kullanıcının "blok blok" şikâyeti giderildi.
+  Sırada: Faz 2 M3 (çalışma animasyonları, kaynak ikonu çizimleri,
+  performans: chunk bake) veya Faz 3 (kayıt genişletme).
+- **Sürüm:** v0.7 (Faz 2 M2) · referans: `prototype/kralliklar-cagi-v0.5.html`.
 - **Son güncelleme:** 2026-07-26 (2. oturum).
-- **Bilinçli ertelenenler:** WebGL atlas (Canvas2D ~56-60 fps veriyor),
-  hayvan/ordu/kervan v2 sprite'ları + iskelet animasyonları (Faz 2 M2),
-  kayıt slotları/IndexedDB/çevrimdışı ilerleme (Faz 3).
+- **Bilinçli ertelenenler:** WebGL atlas / chunk bake (Canvas2D ~42-56 fps
+  yazılım render'ında; cihazda GPU var), köylü çalışma pozları + kaynak
+  ikon çizimleri (Faz 2 M3), kayıt slotları/IndexedDB/çevrimdışı (Faz 3).
 
 ## ✅ Tamamlanan
+### FAZ 2 · M2 — Dünya Nesneleri v2 + Canlı Ayrıntılar (2. oturum, devam)
+- **Kesintisiz zemin (kullanıcı geri bildirimi):** facet degradesi + kenar
+  çizgisi kaldırıldı, 12 ince gölge kademesi, biyom paleti uyumlandı,
+  detay katmanı karo başına 3 varyanttan hash ile seçiliyor (tekrar
+  ızgarası kırıldı), tundraya özel doku, **biyom kenarı yumuşatma**
+  (komşu biyomun rengi 4 yönlü degrade+benek katmanıyla kenardan taşar;
+  su kenarları bilinçli net). Binalar %28 iri (BUILDING_SCALE).
+- **Hayvanlar v2:** iki segmentli eklemli bacaklar (çapraz yürüyüş),
+  degrade gövde, boyun+kafa+burun+göz, tür ayrıntıları (geyik boynuzu,
+  tavşan kulağı, kurt kuyruğu).
+- **Askerler v2:** kollu-bacaklı figürler — miğfer, mızrak, kalkan,
+  krallık renkli tunik şeridi; sancak dalgalanır; sayı rozeti korunur.
+- **Kervan v2:** tırıs atan çeki atı (yele/kuyruk/koşum), damarlı ahşap
+  kasa, kasnaklı krem tente, DÖNEN parmaklıklı tekerlekler, flama.
+- **AI başkenti:** bake edilmiş taş burç sprite'ı (mazgal dişleri, kemerli
+  kapı, gece ışıklı mazgal; gündüz/gece varyantı) + krallık renkli dalgalı
+  bayrak sahnede çizilir (CAPITAL_FLAG direği).
+- **Canlı ayrıntılar:** meydan/ev/fırın bacalarından yükselen duman
+  parçacıkları (SMOKE_VENTS, sadece aktif binalarda); değirmen kanatları
+  sprite'tan çıkarıldı, sahnede DÖNÜYOR (MILL_HUB). Hepsi kozmetik —
+  sim'e dokunmaz, determinizm korunur.
+- **Duman testi:** köy + ordu yürüyüşü (saldırı komutu) + başkent odağı;
+  56 fps, sıfır konsol hatası. 88/88 test yeşil.
 ### FAZ 2 · M1 — Onaylanan Gerçekçi Stil Motorda (2. oturum, devam)
 - **Sanat yönü süreci:** ilk 6 konsept (stil-mockup.html) kullanıcı tarafından
   REDDEDİLDİ (çizgi film gibi, insanlar kolsuz/bacaksız, boyutlar küçük).

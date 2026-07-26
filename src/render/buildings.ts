@@ -16,6 +16,21 @@ export interface BuildingSprite {
   anchorY: number;
 }
 
+/** Dünyada görünen bina boyut çarpanı (kullanıcı isteği: binalar iri). */
+export const BUILDING_SCALE = 1.28;
+
+/** Değirmen kanat göbeği (sprite sol-üstünden, ölçeksiz dünya-px) —
+    kanatlar sprite'a BAKE EDİLMEZ, sahnede dönerek çizilir. */
+export const MILL_HUB = { x: 27, y: 37, r: 34 };
+
+/** Baca ağzı konumları (sprite sol-üstünden, ölçeksiz dünya-px) —
+    sahne bunlardan duman parçacığı yükseltir. */
+export const SMOKE_VENTS: Partial<Record<BuildingType, { x: number; y: number }>> = {
+  center: { x: 47.3, y: 22 },
+  house: { x: 13.5, y: 12 },
+  bakery: { x: 34.5, y: 11 },
+};
+
 type Painter = (c: CanvasRenderingContext2D, rng: RNG, R: (a: number, b: number) => number,
   W: number, H: number, base: number, night: boolean) => void;
 
@@ -462,33 +477,9 @@ const DEFS: Record<BuildingType, Def> = {
       c.closePath(); c.fill();
       c.strokeStyle = 'rgba(30,16,8,0.5)'; c.lineWidth = S;
       c.stroke();
-      // kanatlar (kafesli)
-      const hubX = cx, hubY = by - 3 * S;
+      // kanat göbeği — kanatların kendisi sahnede DÖNEREK çizilir (MILL_HUB)
       c.fillStyle = '#3f2f1c';
-      c.beginPath(); c.arc(hubX, hubY, 2.6 * S, 0, 7); c.fill();
-      for (let i = 0; i < 4; i++) {
-        const a = i * Math.PI / 2 + 0.6;
-        const ex = hubX + Math.cos(a) * 34 * S, ey = hubY + Math.sin(a) * 34 * S;
-        c.strokeStyle = '#4c3a22';
-        c.lineWidth = 2 * S;
-        c.beginPath(); c.moveTo(hubX, hubY); c.lineTo(ex, ey); c.stroke();
-        const px = Math.cos(a + Math.PI / 2) * 5 * S, py = Math.sin(a + Math.PI / 2) * 5 * S;
-        c.strokeStyle = 'rgba(225,215,190,0.85)';
-        c.lineWidth = 0.8 * S;
-        c.beginPath();
-        c.moveTo(hubX + Math.cos(a) * 7 * S, hubY + Math.sin(a) * 7 * S);
-        c.lineTo(hubX + Math.cos(a) * 7 * S + px, hubY + Math.sin(a) * 7 * S + py);
-        c.lineTo(ex + px, ey + py);
-        c.lineTo(ex, ey);
-        c.stroke();
-        for (let s2 = 1; s2 < 4; s2++) {
-          const t = 0.2 + (s2 / 4) * 0.8;
-          c.beginPath();
-          c.moveTo(hubX + Math.cos(a) * 34 * S * t, hubY + Math.sin(a) * 34 * S * t);
-          c.lineTo(hubX + Math.cos(a) * 34 * S * t + px, hubY + Math.sin(a) * 34 * S * t + py);
-          c.stroke();
-        }
-      }
+      c.beginPath(); c.arc(cx, by - 3 * S, 2.6 * S, 0, 7); c.fill();
     },
   },
   bakery: {
@@ -536,9 +527,75 @@ export function buildBuildingSprites(night: boolean): Map<BuildingType, Building
 
     d.paint(c, rng, R, W2, H2, base, night);
 
-    // K: dünyada görünen boyut çarpanı (kullanıcı isteği: binalar daha iri)
-    const K = 1.28;
+    const K = BUILDING_SCALE;
     out.set(type, { cnv, w: d.w * K, h: d.h * K, anchorY: (d.h - 6) * K });
   }
   return out;
+}
+
+/* ============================================================
+   AI BAŞKENT KALESİ — taş burç (bayrak sahnede krallık rengiyle
+   çizilir; direk ucu CAPITAL_FLAG'te).
+   ============================================================ */
+/** Bayrak direği ucu (sprite sol-üstünden, ölçeksiz dünya-px). */
+export const CAPITAL_FLAG = { x: 22, y: 8 };
+
+export function buildCapitalSprite(night: boolean): BuildingSprite {
+  const w = 44, h = 72;
+  const { rng } = painter(night ? 8899 : 8898);
+  const W2 = w * S, H2 = h * S;
+  const cnv = document.createElement('canvas');
+  cnv.width = W2; cnv.height = H2;
+  const c = cnv.getContext('2d')!;
+  const base = H2 - 6 * S;
+
+  // zemin gölgesi
+  const g = c.createRadialGradient(W2 / 2, base + 1 * S, 2, W2 / 2, base + 1 * S, W2 * 0.42);
+  g.addColorStop(0, 'rgba(0,0,0,0.34)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  c.fillStyle = g;
+  c.beginPath(); c.ellipse(W2 / 2, base + 1.4 * S, W2 * 0.42, 5 * S, 0, 0, 7); c.fill();
+
+  const bw = 26 * S, bx = (W2 - bw) / 2, bh = 40 * S, by = base - bh;
+  // taş burç gövdesi
+  stones(c, rng, bx, by, bw, bh, '#7d766a');
+  // sağ yüz gölgesi (hacim)
+  const sg = c.createLinearGradient(W2 / 2, 0, bx + bw, 0);
+  sg.addColorStop(0, 'rgba(0,0,0,0)');
+  sg.addColorStop(1, 'rgba(18,14,10,0.35)');
+  c.fillStyle = sg;
+  c.fillRect(W2 / 2, by, bw / 2, bh);
+  // mazgal dişleri
+  c.save();
+  for (let i = 0; i < 3; i++) {
+    const tx = bx - 1 * S + i * (bw + 2 * S) / 3 + 1 * S;
+    stones(c, rng, tx, by - 5 * S, (bw - 4 * S) / 3, 5.5 * S, '#736c60');
+  }
+  c.restore();
+  // ok mazgalları + pencere
+  c.fillStyle = '#241c12';
+  c.fillRect(W2 / 2 - 1.2 * S, by + 8 * S, 2.4 * S, 7 * S);
+  c.fillRect(W2 / 2 - 1.2 * S, by + 20 * S, 2.4 * S, 7 * S);
+  if (night) {
+    c.fillStyle = '#ffca6a';
+    c.fillRect(W2 / 2 - 0.8 * S, by + 8.5 * S, 1.6 * S, 6 * S);
+  }
+  // kapı (kemerli)
+  c.fillStyle = '#2c2014';
+  c.beginPath();
+  c.moveTo(W2 / 2 - 5 * S, base);
+  c.lineTo(W2 / 2 - 5 * S, base - 8 * S);
+  c.arc(W2 / 2, base - 8 * S, 5 * S, Math.PI, 0);
+  c.lineTo(W2 / 2 + 5 * S, base);
+  c.closePath(); c.fill();
+  // bayrak direği (bayrağın kendisi sahnede krallık rengiyle)
+  c.strokeStyle = '#2c241c';
+  c.lineWidth = 1.6 * S;
+  c.beginPath();
+  c.moveTo(CAPITAL_FLAG.x * S, by - 5 * S);
+  c.lineTo(CAPITAL_FLAG.x * S, CAPITAL_FLAG.y * S);
+  c.stroke();
+
+  const K = BUILDING_SCALE;
+  return { cnv, w: w * K, h: h * K, anchorY: (h - 6) * K };
 }

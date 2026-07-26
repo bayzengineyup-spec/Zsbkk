@@ -7,14 +7,16 @@
    4. Köylüler karo kovalarına konur (karo başına liste taranmaz)
    ============================================================ */
 import type { World } from '../core/world';
-import type { Sim, Building, Villager } from '../core/sim';
+import { isActive, type Sim, type Building, type Villager } from '../core/sim';
 import type { Creature } from '../core/wildlife';
 import type { BuildingType } from '../data/buildings';
 import { BIOMES, type ResourceKind } from '../data/biomes';
 import { SPECIES } from '../data/species';
 import { Camera, TILE_W, TILE_H, type Viewport } from './camera';
 import { shadeBucket, DETAIL_VARIANTS, type TileSprite, type TreeSprite } from './tiles';
-import type { BuildingSprite } from './buildings';
+import {
+  BUILDING_SCALE, MILL_HUB, SMOKE_VENTS, CAPITAL_FLAG, type BuildingSprite,
+} from './buildings';
 import { dayTint } from './daynight';
 import { shade } from './paint';
 
@@ -64,6 +66,7 @@ export interface Frame {
   tileSprites: Map<string, TileSprite>;
   bSprites: Map<BuildingType, BuildingSprite>;
   treeSprites: TreeSprite[];
+  capSprite: BuildingSprite;
   sim: Sim | null;
   sel: TileSel | null;
   ghost: Ghost | null;
@@ -105,7 +108,7 @@ function drawFlames(f: Frame, sx: number, sy: number): void {
   ctx.globalAlpha = 1;
 }
 
-/** Hayvan (yer tutucu dört ayaklı — iskelet animasyonu Faz 2'de). */
+/** Hayvan v2: eklemli bacaklar, kuyruk, kulak, burun — onaylanan stil. */
 function drawCreature(f: Frame, c: Creature): void {
   const { ctx, cam, world } = f;
   const z = cam.zoom;
@@ -116,129 +119,320 @@ function drawCreature(f: Frame, c: Creature): void {
   const iy = Math.max(0, Math.min(world.H - 1, ry | 0));
   const h = world.height[world.idx(ix, iy)];
   const p = cam.worldToScreen(rx - 0.5, ry - 0.5, h);
-  const s = c.scale * z * 0.55;
+  const s = c.scale * z * 0.6;
   const dir = c.flip ? -1 : 1;
   const moving = Math.abs(c.x - c.px) + Math.abs(c.y - c.py) > 0.001;
   const walk = moving ? Math.sin(c.bob * 4) : 0;
+  const bodyY = p.y - S.hgt * 0.66 * s;
 
   // gölge
-  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  ctx.fillStyle = 'rgba(0,0,0,0.24)';
   ctx.beginPath();
-  ctx.ellipse(p.x, p.y + 1 * z, S.len * 0.5 * s, S.hgt * 0.22 * s, 0, 0, Math.PI * 2);
+  ctx.ellipse(p.x, p.y + 1 * z, S.len * 0.52 * s, S.hgt * 0.22 * s, 0, 0, Math.PI * 2);
   ctx.fill();
-  // bacaklar
-  ctx.strokeStyle = S.dark;
-  ctx.lineWidth = 1.4 * s;
-  const legY = p.y - S.hgt * 0.45 * s;
+
+  // bacaklar: iki segmentli (kalça→diz→toynak), çaprazlar birlikte salınır
+  ctx.lineCap = 'round';
   for (let i = 0; i < 4; i++) {
-    const lx = p.x + (i < 2 ? -1 : 1) * S.len * 0.28 * s * dir + (i % 2 ? 1.2 * s : -1.2 * s);
-    const sw = walk * 1.6 * s * (i % 2 ? 1 : -1);
+    const front = i >= 2;
+    const hipX = p.x + (front ? 1 : -1) * S.len * 0.3 * s * dir + (i % 2 ? 1.3 * s : -0.6 * s);
+    const sw = walk * 2 * s * ((i + (front ? 1 : 0)) % 2 ? 1 : -1);
+    const kneeX = hipX + sw * 0.45;
+    const kneeY = p.y - S.hgt * 0.28 * s;
+    ctx.strokeStyle = i % 2 ? shade(S.dark, 0.8) : S.dark;
+    ctx.lineWidth = 1.5 * s;
     ctx.beginPath();
-    ctx.moveTo(lx, legY);
-    ctx.lineTo(lx + sw, p.y + 0.5 * z);
+    ctx.moveTo(hipX, bodyY + S.hgt * 0.2 * s);
+    ctx.lineTo(kneeX, kneeY);
+    ctx.lineTo(hipX + sw, p.y + 0.6 * z);
     ctx.stroke();
   }
-  // gövde
-  ctx.fillStyle = S.body;
+
+  // kuyruk
+  ctx.strokeStyle = S.dark;
+  ctx.lineWidth = 1.1 * s;
   ctx.beginPath();
-  ctx.ellipse(p.x, p.y - S.hgt * 0.62 * s, S.len * 0.5 * s, S.hgt * 0.42 * s, 0, 0, Math.PI * 2);
+  ctx.moveTo(p.x - S.len * 0.5 * s * dir, bodyY - S.hgt * 0.1 * s);
+  ctx.quadraticCurveTo(
+    p.x - S.len * 0.68 * s * dir, bodyY + (c.sp === 'wolf' ? 0.2 : -0.25) * S.hgt * s,
+    p.x - S.len * (c.sp === 'wolf' ? 0.75 : 0.62) * s * dir,
+    bodyY + S.hgt * (c.sp === 'wolf' ? 0.34 : 0.12) * s,
+  );
+  ctx.stroke();
+
+  // gövde: üstü aydınlık degrade elips
+  const bg = ctx.createLinearGradient(0, bodyY - S.hgt * 0.45 * s, 0, bodyY + S.hgt * 0.45 * s);
+  bg.addColorStop(0, shade(S.body, 1.14));
+  bg.addColorStop(0.55, S.body);
+  bg.addColorStop(1, shade(S.body, 0.78));
+  ctx.fillStyle = bg;
+  ctx.beginPath();
+  ctx.ellipse(p.x, bodyY, S.len * 0.5 * s, S.hgt * 0.44 * s, 0, 0, Math.PI * 2);
   ctx.fill();
   // karın
   ctx.fillStyle = S.belly;
+  ctx.globalAlpha = 0.8;
   ctx.beginPath();
-  ctx.ellipse(p.x, p.y - S.hgt * 0.45 * s, S.len * 0.38 * s, S.hgt * 0.2 * s, 0, 0, Math.PI * 2);
+  ctx.ellipse(p.x, bodyY + S.hgt * 0.22 * s, S.len * 0.36 * s, S.hgt * 0.18 * s, 0, 0, Math.PI * 2);
   ctx.fill();
-  // kafa + kulak
-  const hx = p.x + S.len * 0.52 * s * dir;
-  const hy = p.y - S.hgt * 0.85 * s + walk * 0.4 * s;
-  ctx.fillStyle = S.body;
+  ctx.globalAlpha = 1;
+
+  // boyun + kafa
+  const hx = p.x + S.len * 0.54 * s * dir;
+  const hy = bodyY - S.hgt * 0.36 * s + walk * 0.5 * s;
+  ctx.strokeStyle = S.body;
+  ctx.lineWidth = S.hgt * 0.34 * s;
+  ctx.beginPath();
+  ctx.moveTo(p.x + S.len * 0.34 * s * dir, bodyY - S.hgt * 0.1 * s);
+  ctx.lineTo(hx, hy);
+  ctx.stroke();
+  ctx.fillStyle = shade(S.body, 1.06);
   ctx.beginPath();
   ctx.arc(hx, hy, S.hgt * 0.3 * s, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = S.dark;
+  // burun
+  ctx.fillStyle = shade(S.body, 0.92);
   ctx.beginPath();
-  ctx.arc(hx + 1.5 * s * dir, hy - S.hgt * 0.28 * s, S.hgt * 0.12 * s, 0, Math.PI * 2);
+  ctx.ellipse(hx + S.hgt * 0.3 * s * dir, hy + S.hgt * 0.08 * s, S.hgt * 0.2 * s, S.hgt * 0.13 * s, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.fillStyle = '#1c1410';
+  ctx.beginPath();
+  ctx.arc(hx + S.hgt * 0.46 * s * dir, hy + S.hgt * 0.06 * s, 0.5 * s, 0, Math.PI * 2);
+  ctx.fill();
+  // göz
+  ctx.beginPath();
+  ctx.arc(hx + S.hgt * 0.08 * s * dir, hy - S.hgt * 0.08 * s, 0.45 * s, 0, Math.PI * 2);
+  ctx.fill();
+  // kulaklar (tavşanda uzun)
+  const earL = c.sp === 'rabbit' ? 1.1 : 0.4;
+  ctx.strokeStyle = S.dark;
+  ctx.lineWidth = 0.9 * s;
+  for (const eo of [-0.12, 0.1]) {
+    ctx.beginPath();
+    ctx.moveTo(hx - S.hgt * 0.08 * s * dir + eo * S.hgt * s, hy - S.hgt * 0.24 * s);
+    ctx.lineTo(hx - S.hgt * (0.2 - eo) * s * dir + eo * S.hgt * s, hy - S.hgt * (0.24 + earL) * s);
+    ctx.stroke();
+  }
+  // geyik boynuzu
+  if (c.sp === 'deer') {
+    ctx.strokeStyle = '#8a6a42';
+    ctx.lineWidth = 0.7 * s;
+    for (const bo of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(hx + bo * S.hgt * 0.1 * s, hy - S.hgt * 0.26 * s);
+      ctx.lineTo(hx + bo * S.hgt * 0.3 * s, hy - S.hgt * 0.7 * s);
+      ctx.moveTo(hx + bo * S.hgt * 0.2 * s, hy - S.hgt * 0.48 * s);
+      ctx.lineTo(hx + bo * S.hgt * 0.42 * s, hy - S.hgt * 0.62 * s);
+      ctx.stroke();
+    }
+  }
 }
 
-/** Ticaret kervanı (yer tutucu): araba + tekerlekler + krallık flaması. */
+/** Ticaret kervanı v2: at + damarlı ahşap araba + kasnaklı tente + flama. */
 function drawCaravan(f: Frame, sx: number, sy: number, color: string): void {
   const { ctx } = f;
   const z = f.cam.zoom;
+  const trot = Math.sin(f.t * 10 + sx * 0.05); // tırıs salınımı
   // gölge
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillStyle = 'rgba(0,0,0,0.26)';
   ctx.beginPath();
-  ctx.ellipse(sx, sy + 1 * z, 7 * z, 2.5 * z, 0, 0, Math.PI * 2);
+  ctx.ellipse(sx + 2 * z, sy + 1 * z, 11 * z, 2.6 * z, 0, 0, Math.PI * 2);
   ctx.fill();
-  // tekerlekler
-  ctx.fillStyle = '#4a3a26';
-  ctx.beginPath(); ctx.arc(sx - 4 * z, sy, 2.4 * z, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(sx + 4 * z, sy, 2.4 * z, 0, Math.PI * 2); ctx.fill();
-  // kasa + tente
-  ctx.fillStyle = '#7a5c38';
-  ctx.fillRect(sx - 6 * z, sy - 7 * z, 12 * z, 5.5 * z);
-  ctx.fillStyle = '#d8cbb0';
+
+  // ---- çeken at (sağda) ----
+  const hx = sx + 10 * z, hyB = sy - 4 * z;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#4a3826';
+  ctx.lineWidth = 1.3 * z;
+  for (let i = 0; i < 4; i++) {
+    const lx = hx + (i < 2 ? -2.4 : 2.2) * z + (i % 2 ? 0.8 : -0.4) * z;
+    const sw2 = trot * 1.6 * z * (i % 2 ? 1 : -1);
+    ctx.beginPath(); ctx.moveTo(lx, hyB); ctx.lineTo(lx + sw2, sy + 0.6 * z); ctx.stroke();
+  }
+  const hg = ctx.createLinearGradient(0, hyB - 3.4 * z, 0, hyB + 2 * z);
+  hg.addColorStop(0, '#8a6642'); hg.addColorStop(1, '#5f4426');
+  ctx.fillStyle = hg;
+  ctx.beginPath(); ctx.ellipse(hx, hyB - 1.4 * z, 4.4 * z, 2.6 * z, 0, 0, Math.PI * 2); ctx.fill();
+  // boyun + kafa + yele
+  ctx.strokeStyle = '#7a5836'; ctx.lineWidth = 2 * z;
+  ctx.beginPath(); ctx.moveTo(hx + 3.4 * z, hyB - 2.4 * z); ctx.lineTo(hx + 5.6 * z, hyB - 5.6 * z); ctx.stroke();
+  ctx.fillStyle = '#7a5836';
+  ctx.beginPath(); ctx.ellipse(hx + 6.6 * z, hyB - 6 * z, 2.2 * z, 1.3 * z, 0.5, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#3a2a18'; ctx.lineWidth = 0.9 * z;
+  ctx.beginPath(); ctx.moveTo(hx + 3.2 * z, hyB - 2.6 * z); ctx.lineTo(hx + 5.2 * z, hyB - 6 * z); ctx.stroke();
+  // kuyruk
+  ctx.beginPath(); ctx.moveTo(hx - 4.2 * z, hyB - 2 * z);
+  ctx.quadraticCurveTo(hx - 5.6 * z, hyB, hx - 5 * z, hyB + 2 * z); ctx.stroke();
+  // ok kolu (at → araba)
+  ctx.strokeStyle = '#5a4126'; ctx.lineWidth = 0.9 * z;
+  ctx.beginPath(); ctx.moveTo(sx + 4 * z, sy - 3 * z); ctx.lineTo(hx - 3 * z, hyB - 0.6 * z); ctx.stroke();
+
+  // ---- araba ----
+  // arka teker (büyük, parmaklıklı) — döner
+  const wheel = (wx: number, wy: number, r: number) => {
+    ctx.fillStyle = '#3f2f1c';
+    ctx.beginPath(); ctx.arc(wx, wy, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#8a6a42'; ctx.lineWidth = 0.8 * z;
+    const rot = f.t * 2.2;
+    for (let k = 0; k < 4; k++) {
+      const a = rot + (k * Math.PI) / 4;
+      ctx.beginPath();
+      ctx.moveTo(wx - Math.cos(a) * r * 0.8, wy - Math.sin(a) * r * 0.8);
+      ctx.lineTo(wx + Math.cos(a) * r * 0.8, wy + Math.sin(a) * r * 0.8);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#2a1e10'; ctx.lineWidth = 1.1 * z;
+    ctx.beginPath(); ctx.arc(wx, wy, r, 0, Math.PI * 2); ctx.stroke();
+  };
+  // kasa: damarlı ahşap
+  const cg = ctx.createLinearGradient(0, sy - 8 * z, 0, sy - 2 * z);
+  cg.addColorStop(0, '#8a6642'); cg.addColorStop(1, '#5f4426');
+  ctx.fillStyle = cg;
+  ctx.fillRect(sx - 7 * z, sy - 8 * z, 12 * z, 6 * z);
+  ctx.strokeStyle = 'rgba(30,20,10,0.5)'; ctx.lineWidth = 0.5 * z;
+  for (let i = 1; i < 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(sx - 7 * z, sy - 8 * z + i * 2 * z);
+    ctx.lineTo(sx + 5 * z, sy - 8 * z + i * 2 * z);
+    ctx.stroke();
+  }
+  // tente: krem kumaş + kasnak çizgileri
+  const tg = ctx.createLinearGradient(0, sy - 13 * z, 0, sy - 7 * z);
+  tg.addColorStop(0, '#e8ddc2'); tg.addColorStop(1, '#bfae8c');
+  ctx.fillStyle = tg;
   ctx.beginPath();
-  ctx.ellipse(sx, sy - 7.5 * z, 6.4 * z, 3.6 * z, 0, Math.PI, 0);
+  ctx.ellipse(sx - 1 * z, sy - 8 * z, 6.6 * z, 4.6 * z, 0, Math.PI, 0);
   ctx.fill();
-  // flama
-  ctx.strokeStyle = '#2c241c';
-  ctx.lineWidth = z;
-  ctx.beginPath();
-  ctx.moveTo(sx + 5 * z, sy - 8 * z);
-  ctx.lineTo(sx + 5 * z, sy - 14 * z);
-  ctx.stroke();
+  ctx.strokeStyle = 'rgba(90,70,40,0.4)'; ctx.lineWidth = 0.6 * z;
+  for (const ox of [-4, -1, 2]) {
+    ctx.beginPath();
+    ctx.ellipse(sx + ox * z, sy - 8 * z, 2 * z, 4.4 * z, 0, Math.PI, 0, true);
+    ctx.stroke();
+  }
+  wheel(sx - 4 * z, sy - 0.6 * z, 3 * z);
+  wheel(sx + 3.4 * z, sy, 2.4 * z);
+  // krallık flaması
+  ctx.strokeStyle = '#2c241c'; ctx.lineWidth = z;
+  ctx.beginPath(); ctx.moveTo(sx - 6 * z, sy - 9 * z); ctx.lineTo(sx - 6 * z, sy - 16 * z); ctx.stroke();
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.moveTo(sx + 5 * z, sy - 14 * z);
-  ctx.lineTo(sx + 9 * z, sy - 12.7 * z);
-  ctx.lineTo(sx + 5 * z, sy - 11.5 * z);
+  ctx.moveTo(sx - 6 * z, sy - 16 * z);
+  ctx.lineTo(sx - 2 * z, sy - 14.7 * z);
+  ctx.lineTo(sx - 6 * z, sy - 13.5 * z);
   ctx.closePath();
   ctx.fill();
 }
 
-/** Yürüyen ordu (yer tutucu): asker kümesi + sancak + sayı rozeti. */
+/** Tek asker: kollu-bacaklı, miğferli, mızrak+kalkanlı (onaylanan stil). */
+function drawSoldier(
+  f: Frame, sx: number, sy: number, phase: number, color: string, shield: boolean,
+): void {
+  const { ctx } = f;
+  const z = f.cam.zoom;
+  const walk = Math.sin(f.t * 9 + phase);
+  const bob = Math.abs(walk) * 0.5 * z;
+  const footY = sy + 0.8 * z;
+  const hipY = footY - 4.6 * z - bob;
+  const shoY = hipY - 4.2 * z;
+  ctx.lineCap = 'round';
+  // bacaklar
+  ctx.strokeStyle = '#3a2c1c';
+  ctx.lineWidth = 1.4 * z;
+  ctx.beginPath();
+  ctx.moveTo(sx - 0.8 * z, hipY);
+  ctx.lineTo(sx - 0.8 * z + walk * 1.8 * z, footY);
+  ctx.moveTo(sx + 0.8 * z, hipY);
+  ctx.lineTo(sx + 0.8 * z - walk * 1.8 * z, footY);
+  ctx.stroke();
+  // gövde: deri yelek + krallık renkli tunik şeridi
+  ctx.fillStyle = '#5a4632';
+  ctx.beginPath();
+  ctx.moveTo(sx - 2.1 * z, hipY + 0.5 * z);
+  ctx.lineTo(sx + 2.1 * z, hipY + 0.5 * z);
+  ctx.lineTo(sx + 1.6 * z, shoY);
+  ctx.lineTo(sx - 1.6 * z, shoY);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.85;
+  ctx.fillRect(sx - 1.9 * z, shoY + 1.2 * z, 3.8 * z, 1.3 * z);
+  ctx.globalAlpha = 1;
+  // kollar
+  ctx.strokeStyle = '#4c3a28';
+  ctx.lineWidth = 1.1 * z;
+  ctx.beginPath();
+  ctx.moveTo(sx - 1.6 * z, shoY + 0.8 * z);
+  ctx.lineTo(sx - 2.2 * z + walk * 1.2 * z, hipY - 0.4 * z);
+  ctx.stroke();
+  // mızrak tutan kol + mızrak
+  ctx.beginPath();
+  ctx.moveTo(sx + 1.6 * z, shoY + 0.8 * z);
+  ctx.lineTo(sx + 2.4 * z, shoY + 2 * z);
+  ctx.stroke();
+  ctx.strokeStyle = '#8a7048';
+  ctx.lineWidth = 0.7 * z;
+  ctx.beginPath();
+  ctx.moveTo(sx + 2.4 * z, sy + 0.5 * z);
+  ctx.lineTo(sx + 2.4 * z, shoY - 6.5 * z);
+  ctx.stroke();
+  ctx.fillStyle = '#b8bec6';
+  ctx.beginPath();
+  ctx.moveTo(sx + 2.4 * z, shoY - 8.2 * z);
+  ctx.lineTo(sx + 3.1 * z, shoY - 6.2 * z);
+  ctx.lineTo(sx + 1.7 * z, shoY - 6.2 * z);
+  ctx.closePath(); ctx.fill();
+  // kalkan (soldaki figürlerde)
+  if (shield) {
+    ctx.fillStyle = '#6b4a28';
+    ctx.beginPath();
+    ctx.ellipse(sx - 2.6 * z, hipY - 1.4 * z, 1.5 * z, 2 * z, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#3a2814';
+    ctx.lineWidth = 0.5 * z;
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(sx - 2.6 * z, hipY - 1.4 * z, 0.6 * z, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // kafa + miğfer
+  const headY = shoY - 1.9 * z;
+  ctx.fillStyle = '#e8c298';
+  ctx.beginPath();
+  ctx.arc(sx, headY, 1.7 * z, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#9aa2ac';
+  ctx.beginPath();
+  ctx.arc(sx, headY - 0.3 * z, 1.75 * z, Math.PI * 1.02, Math.PI * 1.98);
+  ctx.closePath(); ctx.fill();
+  ctx.fillRect(sx - 1.75 * z, headY - 0.5 * z, 3.5 * z, 0.5 * z);
+}
+
+/** Yürüyen ordu v2: kollu-bacaklı asker kümesi + sancak + sayı rozeti. */
 function drawArmy(f: Frame, sx: number, sy: number, color: string, size: number): void {
   const { ctx } = f;
   const z = f.cam.zoom;
-  const step = Math.sin(f.t * 9) * 0.8 * z; // yürüyüş sallanması
   // gölge
   ctx.fillStyle = 'rgba(0,0,0,0.28)';
   ctx.beginPath();
-  ctx.ellipse(sx, sy + 1.5 * z, 8 * z, 3 * z, 0, 0, Math.PI * 2);
+  ctx.ellipse(sx, sy + 1.5 * z, 8.5 * z, 3 * z, 0, 0, Math.PI * 2);
   ctx.fill();
-  // asker kümesi (3 figür)
-  const offs: [number, number][] = [[-5, 0], [0, -2], [5, 0]];
-  for (let i = 0; i < offs.length; i++) {
-    const ox = offs[i][0] * z, oy = offs[i][1] * z + (i === 1 ? -step : step);
-    ctx.fillStyle = '#3a3430';
-    ctx.beginPath();
-    ctx.ellipse(sx + ox, sy - 4 * z + oy, 2.2 * z, 3.4 * z, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#e8c8a0';
-    ctx.beginPath();
-    ctx.arc(sx + ox, sy - 8.5 * z + oy, 1.8 * z, 0, Math.PI * 2);
-    ctx.fill();
-    // mızrak
-    ctx.strokeStyle = '#8a7a5a';
-    ctx.lineWidth = 0.9 * z;
-    ctx.beginPath();
-    ctx.moveTo(sx + ox + 2 * z, sy - 2 * z + oy);
-    ctx.lineTo(sx + ox + 2 * z, sy - 13 * z + oy);
-    ctx.stroke();
-  }
+  // asker kümesi (arkadan öne)
+  drawSoldier(f, sx, sy - 2.2 * z, 2.1, color, false);
+  drawSoldier(f, sx - 4.8 * z, sy, 0, color, true);
+  drawSoldier(f, sx + 4.8 * z, sy, 4.2, color, false);
   // sancak
   ctx.strokeStyle = '#2c241c';
   ctx.lineWidth = 1.2 * z;
   ctx.beginPath();
-  ctx.moveTo(sx - 7 * z, sy - 3 * z);
-  ctx.lineTo(sx - 7 * z, sy - 18 * z);
+  ctx.moveTo(sx - 7.5 * z, sy - 3 * z);
+  ctx.lineTo(sx - 7.5 * z, sy - 18 * z);
   ctx.stroke();
+  const wv = Math.sin(f.t * 5) * 0.8 * z; // bayrak dalgası
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.moveTo(sx - 7 * z, sy - 18 * z);
-  ctx.lineTo(sx - 1 * z, sy - 16 * z);
-  ctx.lineTo(sx - 7 * z, sy - 14 * z);
+  ctx.moveTo(sx - 7.5 * z, sy - 18 * z);
+  ctx.quadraticCurveTo(sx - 4.5 * z, sy - 17.5 * z + wv, sx - 1.5 * z, sy - 16.5 * z);
+  ctx.quadraticCurveTo(sx - 4.5 * z, sy - 15.5 * z + wv, sx - 7.5 * z, sy - 14 * z);
   ctx.closePath();
   ctx.fill();
   // sayı rozeti
@@ -256,34 +450,82 @@ function drawArmy(f: Frame, sx: number, sy: number, color: string, size: number)
   ctx.fillText(label, sx, sy - 21 * z);
 }
 
-/** AI krallık başkenti işareti (yer tutucu — gerçek doku Faz 2'de). */
+/** AI krallık başkenti: bake edilmiş taş kale + krallık renkli dalgalı bayrak. */
 function drawCapital(f: Frame, sx: number, sy: number, color: string): void {
   const { ctx } = f;
   const z = f.cam.zoom;
-  // kule gövdesi
-  ctx.fillStyle = '#4a4038';
-  ctx.fillRect(sx - 7 * z, sy - 16 * z, 14 * z, 14 * z);
-  ctx.fillStyle = '#5f544a';
-  ctx.fillRect(sx - 7 * z, sy - 16 * z, 14 * z, 4 * z);
-  // burç dişleri
-  ctx.fillStyle = '#4a4038';
-  for (let i = -1; i <= 1; i++) {
-    ctx.fillRect(sx + i * 5 * z - 1.5 * z, sy - 19 * z, 3 * z, 3.5 * z);
-  }
-  // krallık bayrağı
-  ctx.strokeStyle = '#2c241c';
-  ctx.lineWidth = 1.2 * z;
-  ctx.beginPath();
-  ctx.moveTo(sx, sy - 19 * z);
-  ctx.lineTo(sx, sy - 28 * z);
-  ctx.stroke();
+  const spr = f.capSprite;
+  const drawX = sx - (spr.w / 2) * z;
+  const drawY = sy - spr.anchorY * z;
+  ctx.drawImage(spr.cnv, drawX, drawY, spr.w * z, spr.h * z);
+  f.stats.sprites++;
+  // bayrak: direk ucundan krallık renginde, hafif dalgalı
+  const K = BUILDING_SCALE;
+  const fx = drawX + CAPITAL_FLAG.x * K * z;
+  const fy = drawY + CAPITAL_FLAG.y * K * z;
+  const wv = Math.sin(f.t * 4 + sx * 0.03) * 0.8 * z;
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.moveTo(sx, sy - 28 * z);
-  ctx.lineTo(sx + 7 * z, sy - 26 * z);
-  ctx.lineTo(sx, sy - 24 * z);
+  ctx.moveTo(fx, fy);
+  ctx.quadraticCurveTo(fx + 4.5 * z, fy + 0.8 * z + wv, fx + 9 * z, fy + 1.6 * z);
+  ctx.quadraticCurveTo(fx + 4.5 * z, fy + 2.6 * z + wv, fx, fy + 3.6 * z);
   ctx.closePath();
   ctx.fill();
+}
+
+/** Baca dumanı (kozmetik): yükselen, büyüyüp sönen 3 parçacık. */
+function drawSmoke(f: Frame, sx: number, sy: number, seed: number): void {
+  const { ctx } = f;
+  const z = f.cam.zoom;
+  for (let k = 0; k < 3; k++) {
+    const ph = (f.t * 0.3 + seed * 0.137 + k / 3) % 1;
+    const r = (1.6 + ph * 5) * z;
+    const a = (1 - ph) * 0.26;
+    const dx = Math.sin(f.t * 0.9 + seed + k * 2.1) * 1.6 * z + ph * 5 * z;
+    ctx.fillStyle = `rgba(205,200,192,${a})`;
+    ctx.beginPath();
+    ctx.arc(sx + dx, sy - ph * 24 * z, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/** Değirmen kanatları: sahnede döner (sprite'a bake edilmez). */
+function drawMillBlades(f: Frame, hubX: number, hubY: number): void {
+  const { ctx } = f;
+  const z = f.cam.zoom;
+  const K = BUILDING_SCALE;
+  const L = MILL_HUB.r * K * z;
+  const rot = f.t * 0.55;
+  for (let i = 0; i < 4; i++) {
+    const a = rot + (i * Math.PI) / 2;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const ex = hubX + ca * L, ey = hubY + sa * L;
+    ctx.strokeStyle = '#4c3a22';
+    ctx.lineWidth = 2 * K * z;
+    ctx.beginPath(); ctx.moveTo(hubX, hubY); ctx.lineTo(ex, ey); ctx.stroke();
+    // kafes bez yüzey
+    const px = Math.cos(a + Math.PI / 2) * 5 * K * z;
+    const py = Math.sin(a + Math.PI / 2) * 5 * K * z;
+    const inX = hubX + ca * L * 0.2, inY = hubY + sa * L * 0.2;
+    ctx.strokeStyle = 'rgba(225,215,190,0.85)';
+    ctx.lineWidth = 0.8 * K * z;
+    ctx.beginPath();
+    ctx.moveTo(inX, inY);
+    ctx.lineTo(inX + px, inY + py);
+    ctx.lineTo(ex + px, ey + py);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+    for (let s2 = 1; s2 < 4; s2++) {
+      const t = 0.2 + (s2 / 4) * 0.8;
+      ctx.beginPath();
+      ctx.moveTo(hubX + ca * L * t, hubY + sa * L * t);
+      ctx.lineTo(hubX + ca * L * t + px, hubY + sa * L * t + py);
+      ctx.stroke();
+    }
+  }
+  // göbek
+  ctx.fillStyle = '#3f2f1c';
+  ctx.beginPath(); ctx.arc(hubX, hubY, 1.6 * K * z, 0, Math.PI * 2); ctx.fill();
 }
 
 /** Köylü: kollu-bacaklı yürüyen insan (onaylanan stil — mockup2 person()). */
@@ -618,6 +860,26 @@ export function drawScene(f: Frame): void {
             drawConstruction(f, bspr, gx, gy, h, prog);
           } else {
             drawBuildingSprite(f, bspr, gx, gy, h);
+            // canlı ayrıntılar: dönen değirmen kanadı + baca dumanı
+            if (isActive(b)) {
+              const K = BUILDING_SCALE;
+              if (b.type === 'mill') {
+                drawMillBlades(
+                  f,
+                  c.x - (bspr.w / 2) * z + MILL_HUB.x * K * z,
+                  c.y - bspr.anchorY * z + MILL_HUB.y * K * z,
+                );
+              }
+              const vent = SMOKE_VENTS[b.type];
+              if (vent && !dim) {
+                drawSmoke(
+                  f,
+                  c.x - (bspr.w / 2) * z + vent.x * K * z,
+                  c.y - bspr.anchorY * z + vent.y * K * z,
+                  i % 97,
+                );
+              }
+            }
             if (b.upgrading && b.buildLeft !== undefined) {
               const prog = 1 - b.buildLeft / (b.buildTotal ?? 1);
               drawProgressBar(f, c.x, c.y - 30 * z, prog, '#7fb3d5');
