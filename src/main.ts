@@ -8,7 +8,7 @@ import { Sim } from './core/sim';
 import { BIOMES } from './data/biomes';
 import { BUILDINGS, costStr, upgradeCost, upgradeTime, type BuildingType } from './data/buildings';
 import { Camera, type Viewport } from './render/camera';
-import { buildTileSprites } from './render/tiles';
+import { buildTileSprites, buildTreeSprites } from './render/tiles';
 import { buildBuildingSprites } from './render/buildings';
 import { drawScene, type Frame, type Ghost, type RenderStats, type TileSel } from './render/scene';
 import { MiniMap } from './render/minimap';
@@ -20,7 +20,7 @@ import {
   getMusicVol, getSfxVol, setMusicVol, setSfxVol,
 } from './ui/sound';
 import { Tut, initTutorial, resetTutorial, updateTutorial } from './ui/tutorial';
-import { timeOfDayLabel } from './render/daynight';
+import { timeOfDayLabel, dayLight } from './render/daynight';
 import {
   initDiplo, openDiploPanel, closeDiploPanel, refreshDiploPanel, diploOpen,
 } from './ui/diplo';
@@ -29,6 +29,9 @@ import {
 } from './ui/techpanel';
 import { UNITS, UNIT_KEYS, compTotal, compLabel } from './data/units';
 import { CMD_TRAITS } from './data/techs';
+import { applyTheme } from './ui/theme';
+
+applyTheme(); // parşömen/ahşap arayüz dokuları (kozmetik)
 
 function el<T extends HTMLElement>(id: string): T {
   const e = document.getElementById(id);
@@ -61,9 +64,15 @@ resize();
 // ---------- durum ----------
 const cam = new Camera(view);
 const tileSprites = buildTileSprites();
-const bSprites = buildBuildingSprites();
+const bSpritesDay = buildBuildingSprites(false);
+const bSpritesNight = buildBuildingSprites(true); // pencereler ışıklı
+const treeSprites = buildTreeSprites();
 let world: World | null = null;
 let sim: Sim | null = null;
+// geliştirici konsolu için salt-okunur erişim (duman testleri de kullanır)
+Object.defineProperty(window, '__game', {
+  get: () => ({ sim, world }),
+});
 let minimap: MiniMap | null = null;
 let sel: TileSel | null = null;
 let ghost: Ghost | null = null;
@@ -691,7 +700,9 @@ function loop(t: number): void {
 
     const frame: Frame = {
       ctx, world, cam, view,
-      tileSprites, bSprites,
+      tileSprites,
+      bSprites: dayLight(sim.time.t) < 0.35 ? bSpritesNight : bSpritesDay,
+      treeSprites,
       sim, sel, ghost, alpha, t: renderT, stats,
     };
     drawScene(frame);

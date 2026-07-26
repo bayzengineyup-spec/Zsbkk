@@ -13,9 +13,10 @@ import type { BuildingType } from '../data/buildings';
 import type { ResourceKind } from '../data/biomes';
 import { SPECIES } from '../data/species';
 import { Camera, TILE_W, TILE_H, type Viewport } from './camera';
-import { shadeBucket, type TileSprite } from './tiles';
+import { shadeBucket, type TileSprite, type TreeSprite } from './tiles';
 import type { BuildingSprite } from './buildings';
 import { dayTint } from './daynight';
+import { shade } from './paint';
 
 export interface TileSel { gx: number; gy: number; }
 
@@ -33,10 +34,19 @@ const RES_COLORS: Record<ResourceKind, string> = {
 
 /* köylü görünümü: isimden deterministik renk (aynı köylü hep aynı) */
 const SHIRT_COLORS = ['#8a5a3a', '#5a7a8a', '#7a8a4a', '#8a4a5a', '#6a5a8a', '#8a7a3a'];
+const HAIR_COLORS = ['#2c1c10', '#4a3018', '#6b4a22', '#8a6a3a', '#3d3d3d'];
 function nameHash(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
   return Math.abs(h);
+}
+
+/* karo indeksinden deterministik ağaç yerleşimi */
+function tileHash(i: number): number {
+  let h = (i + 0x9e3779b9) | 0;
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return (h ^ (h >>> 16)) >>> 0;
 }
 
 export interface RenderStats { tiles: number; sprites: number; }
@@ -48,6 +58,7 @@ export interface Frame {
   view: Viewport;
   tileSprites: Map<string, TileSprite>;
   bSprites: Map<BuildingType, BuildingSprite>;
+  treeSprites: TreeSprite[];
   sim: Sim | null;
   sel: TileSel | null;
   ghost: Ghost | null;
@@ -270,6 +281,7 @@ function drawCapital(f: Frame, sx: number, sy: number, color: string): void {
   ctx.fill();
 }
 
+/** Köylü: kollu-bacaklı yürüyen insan (onaylanan stil — mockup2 person()). */
 function drawVillager(f: Frame, v: Villager): void {
   const { ctx, cam, world } = f;
   const z = cam.zoom;
@@ -280,22 +292,82 @@ function drawVillager(f: Frame, v: Villager): void {
   const iy = Math.max(0, Math.min(world.H - 1, ry | 0));
   const h = world.height[world.idx(ix, iy)];
   const c = cam.worldToScreen(rx - 0.5, ry - 0.5, h);
-  const bob = Math.sin(v.bob) * 1.2 * z;
+
+  const hash = nameHash(v.name);
+  const tunic = SHIRT_COLORS[hash % SHIRT_COLORS.length];
+  const hair = HAIR_COLORS[(hash >> 3) % HAIR_COLORS.length];
+  const moving = Math.abs(v.x - v.px) + Math.abs(v.y - v.py) > 0.0005;
+  const walk = moving ? Math.sin(v.bob * 2.2) : 0; // bacak/kol salınımı
+  const bob = moving ? Math.abs(Math.sin(v.bob * 2.2)) * 0.6 * z : 0;
+  const footY = c.y + 1 * z;
+  const hipY = footY - 5 * z - bob;
+  const shoulderY = hipY - 4.6 * z;
 
   // gölge
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
   ctx.beginPath();
-  ctx.ellipse(c.x, c.y + 1 * z, 3.2 * z, 1.5 * z, 0, 0, Math.PI * 2);
+  ctx.ellipse(c.x, footY + 0.4 * z, 3.2 * z, 1.3 * z, 0, 0, Math.PI * 2);
   ctx.fill();
-  // gövde
-  ctx.fillStyle = SHIRT_COLORS[nameHash(v.name) % SHIRT_COLORS.length];
+
+  // bacaklar (koyu pantolon, yürürken makas)
+  ctx.strokeStyle = '#42311e';
+  ctx.lineWidth = 1.5 * z;
+  ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.ellipse(c.x, c.y - 4 * z + bob, 2.6 * z, 4 * z, 0, 0, Math.PI * 2);
+  ctx.moveTo(c.x - 0.9 * z, hipY);
+  ctx.lineTo(c.x - 0.9 * z + walk * 2 * z, footY);
+  ctx.moveTo(c.x + 0.9 * z, hipY);
+  ctx.lineTo(c.x + 0.9 * z - walk * 2 * z, footY);
+  ctx.stroke();
+
+  // gövde (tunik: omuzdan kalçaya hafif genişleyen)
+  ctx.fillStyle = tunic;
+  ctx.beginPath();
+  ctx.moveTo(c.x - 2.3 * z, hipY + 0.6 * z);
+  ctx.lineTo(c.x + 2.3 * z, hipY + 0.6 * z);
+  ctx.lineTo(c.x + 1.7 * z, shoulderY);
+  ctx.lineTo(c.x - 1.7 * z, shoulderY);
+  ctx.closePath();
   ctx.fill();
-  // kafa
-  ctx.fillStyle = '#e8c8a0';
+  // sağ yan gölgesi (hacim)
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
   ctx.beginPath();
-  ctx.arc(c.x, c.y - 9.5 * z + bob, 2.2 * z, 0, Math.PI * 2);
+  ctx.moveTo(c.x + 0.6 * z, hipY + 0.6 * z);
+  ctx.lineTo(c.x + 2.3 * z, hipY + 0.6 * z);
+  ctx.lineTo(c.x + 1.7 * z, shoulderY);
+  ctx.lineTo(c.x + 0.6 * z, shoulderY);
+  ctx.closePath();
+  ctx.fill();
+  // kemer
+  ctx.fillStyle = '#332412';
+  ctx.fillRect(c.x - 2.1 * z, hipY - 0.9 * z, 4.2 * z, 0.9 * z);
+
+  // kollar (bacaklarla zıt salınım)
+  ctx.strokeStyle = shade(tunic, 0.78);
+  ctx.lineWidth = 1.2 * z;
+  ctx.beginPath();
+  ctx.moveTo(c.x - 1.8 * z, shoulderY + 0.8 * z);
+  ctx.lineTo(c.x - 2.3 * z - walk * 1.6 * z, hipY - 0.4 * z);
+  ctx.moveTo(c.x + 1.8 * z, shoulderY + 0.8 * z);
+  ctx.lineTo(c.x + 2.3 * z + walk * 1.6 * z, hipY - 0.4 * z);
+  ctx.stroke();
+  // eller (ten)
+  ctx.fillStyle = '#e0b88c';
+  ctx.beginPath();
+  ctx.arc(c.x - 2.3 * z - walk * 1.6 * z, hipY - 0.2 * z, 0.65 * z, 0, Math.PI * 2);
+  ctx.arc(c.x + 2.3 * z + walk * 1.6 * z, hipY - 0.2 * z, 0.65 * z, 0, Math.PI * 2);
+  ctx.fill();
+
+  // kafa + saç
+  const headY = shoulderY - 2.2 * z;
+  ctx.fillStyle = '#e8c298';
+  ctx.beginPath();
+  ctx.arc(c.x, headY, 1.9 * z, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = hair;
+  ctx.beginPath();
+  ctx.arc(c.x, headY - 0.4 * z, 1.9 * z, Math.PI * 1.05, Math.PI * 1.95);
+  ctx.quadraticCurveTo(c.x, headY - 2.9 * z, c.x + 1.85 * z, headY - 0.75 * z);
   ctx.fill();
 }
 
@@ -480,6 +552,28 @@ export function drawScene(f: Frame): void {
         ctx.arc(c.x, c.y, 3.2 * z, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
+      }
+
+      // ağaçlar: orman/iğne orman karolarına deterministik dikim
+      const biome = world.tiles[i];
+      if ((biome === 'forest' || biome === 'taiga') && !bMap.has(i) && f.treeSprites.length) {
+        const count = 1 + (tileHash(i) & 1);
+        for (let k = 0; k < count; k++) {
+          const hk = tileHash(i * 3 + k + 1);
+          const variant = biome === 'taiga' ? 2 : (hk % 7 === 0 ? 2 : hk % 2);
+          const tr = f.treeSprites[variant % f.treeSprites.length];
+          const sc = 0.62 + (((hk >>> 20) & 63) / 63) * 0.3;
+          const ox = ((((hk >>> 4) & 255) / 255) - 0.5) * TILE_W * 0.44 * z;
+          const oy = ((((hk >>> 12) & 255) / 255) - 0.5) * TILE_H * 0.4 * z + 2 * z;
+          ctx.drawImage(
+            tr.cnv,
+            c.x + ox - (tr.w / 2) * sc * z,
+            c.y + oy - tr.baseY * sc * z,
+            tr.w * sc * z,
+            tr.h * sc * z,
+          );
+          f.stats.sprites++;
+        }
       }
 
       // AI başkenti

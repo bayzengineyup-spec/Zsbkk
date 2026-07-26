@@ -4,16 +4,50 @@
 > her oturum sonunda güncellenir. "Neredeydik, ne yaptık, sırada ne var?"
 
 ## 📍 Şu an
-- **Aşama:** 🎉 **FAZ 1 TAMAMLANDI** (M1 inşa süreleri + M2 üretim zincirleri).
-  Sırada kullanıcı tercihiyle: **Faz 2 (gerçek dokular — her öğe ayrı)** veya
-  **Faz 3 (kayıt genişletme: slotlar, IndexedDB, çevrimdışı ilerleme)**.
-- **Sürüm:** v0.7 (Faz 1 final) · referans: `prototype/kralliklar-cagi-v0.5.html`.
+- **Aşama:** **FAZ 2 · M1 TAMAMLANDI** — kullanıcının onayladığı gerçekçi
+  sanat yönü (docs/concepts/stil-mockup2.html, "Bunlar baya iyi bunları seç")
+  motora işlendi: karo/bina/ağaç/köylü sprite'ları + parşömen-ahşap arayüz.
+  Sırada: Faz 2 M2 (hayvan/ordu/kervan/başkent sprite yenileme + animasyon
+  durum makineleri) veya Faz 3 (kayıt genişletme).
+- **Sürüm:** v0.7 (Faz 2 M1) · referans: `prototype/kralliklar-cagi-v0.5.html`.
 - **Son güncelleme:** 2026-07-26 (2. oturum).
-- **Bilinçli ertelenenler:** WebGL atlas (Canvas2D 60 fps veriyor; sprite
-  sayısı artınca), iskelet animasyonları + gerçek dokular (Faz 2), kayıt
-  slotları/IndexedDB/çevrimdışı ilerleme (Faz 3).
+- **Bilinçli ertelenenler:** WebGL atlas (Canvas2D ~56-60 fps veriyor),
+  hayvan/ordu/kervan v2 sprite'ları + iskelet animasyonları (Faz 2 M2),
+  kayıt slotları/IndexedDB/çevrimdışı ilerleme (Faz 3).
 
 ## ✅ Tamamlanan
+### FAZ 2 · M1 — Onaylanan Gerçekçi Stil Motorda (2. oturum, devam)
+- **Sanat yönü süreci:** ilk 6 konsept (stil-mockup.html) kullanıcı tarafından
+  REDDEDİLDİ (çizgi film gibi, insanlar kolsuz/bacaksız, boyutlar küçük).
+  Sıfırdan yüksek ayrıntılı gerçekçi konseptler üretildi
+  (**stil-mockup2.html**, ?mood=1..4) → kullanıcı ONAYLADI. Bu stil artık
+  bağlayıcı referans.
+- **`render/paint.ts` (yeni):** mockup2 tekniklerinin motor yardımcıları —
+  taş taş duvar, sıva (leke/çatlak/nem/gren), damarlı kiriş, sıra sıra
+  kiremit+yosun+mahya, gündüz/gece pencere, kalas kapı; `painter(seed)` ile
+  tamamen deterministik.
+- **Karolar v2 (`render/tiles.ts`):** biyom başına zengin doku — çayırda tek
+  tek ot yaprakları+çiçek, suda yansıma/derinlik, kayada ışıklı bloklar,
+  karda parıltı, bataklıkta su birikintileri; etek katman çizgileri.
+- **Ağaçlar (`buildTreeSprites`):** 2 meşe + 1 çam; katmanlı taç, dallı gövde,
+  güneş benekleri. Sahnede orman/iğne orman karolarına karo indeksinden
+  deterministik dikim (1-2 ağaç, konum/boy/tür sabit hash'ten).
+- **Binalar v2 (`render/buildings.ts`):** 14 tip, tip başına özel ressam —
+  taş temel + sıvalı ahşap karkas gövde + kiremit çatı + baca/bayrak;
+  değirmende kafes kanat, bıçkıhanede testere, fırında büyük baca, kışla/sur
+  mazgallı taş. **Gündüz/gece iki sprite seti** (`buildBuildingSprites(night)`)
+  — gece pencereleri ışıl ışıl; `dayLight<0.35` eşiğiyle otomatik geçiş.
+- **Köylüler artık kollu-bacaklı insan:** yürüyüş makası (bacak+zıt kol
+  salınımı), tunik+kemer+eller+saç; isimden deterministik giysi/saç rengi.
+  (Kullanıcının "ne kolu var ne ayağı" şikâyeti giderildi.)
+- **Arayüz onaylanan stile döndü (`ui/theme.ts` + index.html):** çalışma
+  anında üretilen parşömen ve ahşap dokuları CSS değişkeni olarak veriliyor
+  (harici dosya yok). Paneller parşömen+mürekkep, üst şerit ahşap kiriş,
+  alt şerit **madalyon (yuvarlak metal-ahşap) düğmeler**, serif yazı
+  (Georgia), altın ana düğmeler. "Web sitesi butonu" görünümü kaldırıldı.
+- **Duman testi:** boot→yeni dünya→meydan+5 bina→inşaat→gündüz→gece→paneller;
+  56 fps, sıfır konsol hatası; ekran görüntüleri kullanıcıya gönderildi.
+- **Testler: 88/88** (render değişiklikleri sim'e dokunmuyor; tsc temiz).
 ### FAZ 1 · M2 — Üretim Zincirleri (2. oturum, devam)
 - **Yeni kaynaklar:** 🪚 kereste (plank), 🌫 un (flour), 🥖 ekmek (bread).
 - **Zincirler:** odun → Bıçkıhane → kereste · yiyecek(tahıl) → Değirmen → un
@@ -163,19 +197,15 @@
 - Master plan yazıldı: `docs/00`…`docs/12` + bu DURUM dosyası.
 - Prototip repoya alındı (`prototype/`).
 
-## 🔜 Sıradaki adım — SANAT YÖNÜ SEÇİMİ (kullanıcıda)
-FAZ 2 başladı. Kullanıcının talimatı: grafik/animasyon EN ÖNEMLİ konu ve
-**arayüz de seçilen stile uymalı** (parşömen/ahşap/demir çerçeve; web butonu
-görünümü YASAK). Karar için 6 sanat yönü konsepti üretildi
-(docs/concepts/stil-mockup.html — ?style=1..6):
-1. Elle Boyanmış Orta Çağ (parşömen+ahşap UI)
-2. HD Piksel Sanatı (taş blok UI)
-3. Minyatür Dünya / Kil (yumuşak krem UI)
-4. Mürekkep & Parşömen (el yazması UI)
-5. Sert Kuzey / Karanlık Gerçekçi (demir+perçin UI)
-6. Canlı Stilize / Boyalı Fantezi (cilalı ahşap+altın UI)
-Kullanıcı stil seçince: seçilen stil tüm karo/bina/köylü/hayvan/ordu
-dokularına + UI'ya (index.html teması) uygulanacak. Her öğe için AYRI doku.
+## 🔜 Sıradaki adım — FAZ 2 · M2 (görsel yenilemenin kalanı)
+Onaylanan stil (stil-mockup2) karo/bina/ağaç/köylü + arayüze uygulandı.
+Kalanlar, aynı stil ve `paint.ts` yardımcılarıyla:
+- Hayvan sprite'ları (7 tür — şu an yer tutucu elips gövde).
+- Ordu/asker figürleri (kollu-bacaklı, birim tipine göre teçhizat),
+  kervan arabası, AI başkenti (gerçek kale dokusu).
+- Animasyon durum makineleri (çalışma/taşıma/savaş duruşları), bina bacası
+  dumanı, değirmen kanadı dönüşü gibi canlı ayrıntılar.
+- Kaynak işaretleri (renkli nokta yerine minik ikon çizimleri).
 
 ## 🧠 Karar günlüğü (neden böyle?)
 - **HTML prototipi temel alındı** çünkü gerçek WebGL grafik motoru ve canlı
@@ -192,6 +222,12 @@ dokularına + UI'ya (index.html teması) uygulanacak. Her öğe için AYRI doku.
 - Ekonomi zinciri kaç adım derin olacak.
 
 ## 📝 Oturum notları
+- **2026-07-26 (2h):** FAZ 2 M1 — onaylanan gerçekçi stil motora işlendi:
+  paint.ts yardımcıları, v2 karolar+ağaçlar+binalar (gündüz/gece setleri),
+  kollu-bacaklı köylüler, parşömen/ahşap/madalyon arayüz (ui/theme.ts).
+  56 fps, sıfır hata, 88 test yeşil.
+- **2026-07-26 (2g):** Sanat yönü turu: ilk 6 konsept reddedildi (puanlar
+  1-3/10); gerçekçi mockup2 üretildi ve ONAYLANDI ("Bunlar baya iyi").
 - **2026-07-26 (2f):** FAZ 1 M1 — İNŞA SÜRELERİ: şantiye (yükselen bina +
   iskele + ilerleme çubuğu), işçi hızlandırma, kuyruk sınırı, %70 iade,
   tüm binalara süreli yükseltme, süreli asker eğitim kuyruğu. 81 test
