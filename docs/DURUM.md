@@ -26,8 +26,12 @@
   **FAZ 4 · M3 de TAMAM:** 🐏 koçbaşı (sur etkisi ×0.5, 🪵80+🪚20) ve
   başarılı baskında binaların ateşe verilmesi (mevcut yangın sistemiyle).
   106 test yeşil.
-  Sırada: denge/ilerleme turu, zafer koşulları cilası veya çok oyunculu
-  hazırlık (komut kaydı/replay) — kullanıcıya göre.
+  **DENGE TURU da TAMAM:** otomatik oyuncu botu (komutlarla oynar, hile
+  yok) 25 dk'lık koşularla eğriyi ölçtü; 4 gerçek denge sorunu bulunup
+  düzeltildi (aşağıda). Eğri hedefleri: zincir ~6-9dk, ordu20 ~7-12dk,
+  ilk fetih ~10-15dk, açlık ölümü 0. 108 test yeşil.
+  Sırada: çok oyunculu hazırlık (komut kaydı/replay) veya içerik
+  genişletme — kullanıcıya göre.
 - **Sürüm:** v0.7 (Faz 2 M2) · referans: `prototype/kralliklar-cagi-v0.5.html`.
 - **Son güncelleme:** 2026-07-26 (2. oturum).
 - **Bilinçli ertelenenler:** WebGL atlas / chunk bake (Canvas2D ~42-56 fps
@@ -35,6 +39,26 @@
   ikon çizimleri (Faz 2 M3), kayıt slotları/IndexedDB/çevrimdışı (Faz 3).
 
 ## ✅ Tamamlanan
+### DENGE TURU — Otomatik Oyuncu + Sabit Ayarı (2. oturum)
+- **Ölçüm aracı (`test/autoplay.ts` + `balance.test.ts`):** oyunu YALNIZ
+  komutlarla oynayan bot — inşaat önceliği, işçi yönetimi (bıçkıhaneden
+  işçi çekme dahil), yangın söndürme, araştırma, eğitim, en zayıfa
+  saldırı. 25 dk koşar; kilometre taşları + felaket sayıları raporlanır;
+  eşikler kalıcı regresyon testi (2 tohum).
+- **Bulunan ve düzeltilen denge sorunları:**
+  1. Yangın MEYDANI kül edebiliyordu → köy sessizce felç. Artık meydan
+     (deprem/kasırga gibi) yok edilemez: ağır hasarla söner.
+  2. ODUN KİLİDİ: tek oduncu yıkılıp odun bittiğinde köy kilitleniyordu.
+     Kurtarma damlası: aktif oduncu yokken ve odun <60 iken +0.12/sn.
+  3. Erken oyun felaket baskısı: ilk 3 DAKİKA felaket olayı yok;
+     yangın ağırlığı 2.2→1.7.
+  4. Barbar akınları çok erken/sık/büyüktü: 2. yıldan itibaren, akınlar
+     arası ≥3 dk (lastBarbar kayda girer), boyut 6+pop·0.4+yıl·2 →
+     4+pop·0.3+yıl·1.5.
+- **Sonuç eğrisi (25 dk):** tohum 21: zincir 5.5dk · ordu20 7.4dk ·
+  ilk fetih 9.9dk · 5 saldırı · açlık 0. Tohum 7 (felaketli):
+  zincir 9.2dk · fetih 15.1dk · açlık 0 · köy 65 nüfusla ayakta.
+- **Testler: 108/108** (faz1m2 girdi testi kurtarma damlasına uyarlandı).
 ### FAZ 4 · M3 — Kuşatma & Savunma (2. oturum)
 - **🐏 Koçbaşı:** saldırı başına tek kullanımlık (🪵80 + 🪚20, geri
   gelmez); hedef surlarının savunma katkısını YARIYA indirir. Ordu

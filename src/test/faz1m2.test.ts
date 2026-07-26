@@ -36,10 +36,13 @@ describe('Faz 1 M2 — Üretim zincirleri', () => {
     s.applyCommand({ kind: 'assign', x: p.x + 1, y: p.y, delta: 1 });
     s.player.res.wood = 0; // girdi yok
     for (let i = 0; i < 50; i++) s.tick(0.1);
-    expect(s.player.res.plank).toBeLessThan(0.05); // üretim yok denecek kadar az
+    // NOT: oduncu olmayan köyde "kurtarma damlası" (denge turu) çok küçük
+    // odun sızdırır — üretim yine de fiilen durmuş olmalı
+    expect(s.player.res.plank).toBeLessThan(0.4);
+    const plankStall = s.player.res.plank;
     s.player.res.wood = 100; // girdi geldi
     for (let i = 0; i < 50; i++) s.tick(0.1);
-    expect(s.player.res.plank).toBeGreaterThan(0.5); // üretim başladı
+    expect(s.player.res.plank).toBeGreaterThan(plankStall + 0.5); // üretim başladı
   });
 
   it('değirmen kereste ister (zincir sırası zorunlu)', () => {

@@ -172,6 +172,7 @@ export class Sim {
       takeGold: (n) => { this.player.res.gold = Math.max(0, this.player.res.gold - n); },
       season: () => this.currentSeason(),
       year: () => this.time.year,
+      time: () => this.time.t,
       toast: (msg, kind) => this.toast(msg, kind ?? ''),
       spawnBarbarians: () => this.military.barbarianRaid(),
       hasBarracks: () => this.hasBarracks(),
@@ -798,6 +799,13 @@ export class Sim {
         // depo dolu uyarısı (üretim boşa gidiyor)
         if (gain > 0 && before + gain > p.storageCap) this.warnStorageFull(k);
       }
+    }
+
+    // --- kurtarma damlası: oduncu kalmadıysa ve odun dibe vurduysa
+    //     köylüler kendiliğinden dal toplar (odun kilidi kırılır) ---
+    if (p.res.wood < 60
+      && !p.buildings.some(b => b.type === 'woodcutter' && isActive(b))) {
+      p.res.wood = Math.min(p.storageCap, p.res.wood + 0.12 * dt);
     }
 
     // --- tüketim: önce ekmek (1 ekmek = 2 yiyecek değerinde) ---

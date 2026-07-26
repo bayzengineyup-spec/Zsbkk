@@ -35,6 +35,8 @@ export interface EventHost {
   takeGold(n: number): void;
   season(): SeasonDef;
   year(): number;
+  /** sim zamanı (sn) — erken oyun koruması için */
+  time(): number;
   toast(msg: string, kind?: '' | 'good' | 'bad'): void;
   /** Barbar akını başlat (askeri sistem) — başarı durumu döner. */
   spawnBarbarians(): boolean;
@@ -50,6 +52,8 @@ export class EventSystem {
   activeEffects: ActiveEffect[] = [];
   /** Rastgele olay zamanlayıcısı (testler devre dışı bırakabilir). */
   eventAcc = 0;
+  /** son barbar akını zamanı (sn) — akın araları açık kalsın */
+  lastBarbar = -1e9;
   private plagueTimer = 0;
 
   constructor(private readonly host: EventHost) {}
@@ -199,14 +203,27 @@ export class EventSystem {
     const pool: { w: number; fn: () => boolean }[] = [];
     const push = (w: number, fn: () => boolean) => { if (w > 0) pool.push({ w, fn }); };
 
+    // ERKEN OYUN KORUMASI (denge turu bulgusu): ilk 3 dakika felaket yok —
+    // oyuncu köyünü kurmadan yıkım başlamasın
+    const early = this.host.time() < 180;
+
     // felaketler — koşullu ağırlık
-    push(this.woodenRatio() * s.fire * 2.2 * this.host.disasterMult(), () => this.eventFire());
-    push(this.crowding() * 1.6 * (this.hasEffect('plague') ? 0 : 1), () => this.eventPlague());
-    push(0.5 * this.host.disasterMult(), () => this.eventEarthquake());
-    push(this.woodenRatio() * 1.0, () => this.eventStorm());
-    push(s.key === 'kis' && !this.hasEffect('harsh') ? 2.2 : 0, () => this.eventHarshWinter());
-    push(this.host.year() >= 1 ? 1.4 : 0, () => this.host.spawnBarbarians());
-    push(this.host.happy() < 25 ? 3.0 : 0, () => this.eventRebellion());
+    if (!early) {
+      push(this.woodenRatio() * s.fire * 1.7 * this.host.disasterMult(), () => this.eventFire());
+      push(this.crowding() * 1.6 * (this.hasEffect('plague') ? 0 : 1), () => this.eventPlague());
+      push(0.5 * this.host.disasterMult(), () => this.eventEarthquake());
+      push(this.woodenRatio() * 1.0, () => this.eventStorm());
+      push(s.key === 'kis' && !this.hasEffect('harsh') ? 2.2 : 0, () => this.eventHarshWinter());
+      // barbarlar: 2. yıldan itibaren + akınlar arası en az 3 dakika
+      const barbarOk = this.host.year() >= 2
+        && this.host.time() - this.lastBarbar >= 180;
+      push(barbarOk ? 1.1 : 0, () => {
+        const ok = this.host.spawnBarbarians();
+        if (ok) this.lastBarbar = this.host.time();
+        return ok;
+      });
+      push(this.host.happy() < 25 ? 3.0 : 0, () => this.eventRebellion());
+    }
 
     // iyi olaylar
     push(this.host.happy() > 60 ? 1.6 : 0.5, () => this.eventGoldenAge());
@@ -243,6 +260,15 @@ export class EventSystem {
         }
       }
       if (b.hp <= 0) {
+        if (b.type === 'center') {
+          // meydan asla kül olmaz (deprem/kasırga gibi) — köy felç kalmasın;
+          // yangın söner, ağır hasar izi kalır
+          b.burning = false;
+          b.hp = 30;
+          this.host.toast('🔥 Meydan ağır hasar aldı ama ayakta kaldı!', 'bad');
+          this.host.addHappy(-6);
+          continue;
+        }
         const nm = BUILDINGS[b.type].name;
         this.host.removeBuilding(b);
         this.host.toast(`🔥 ${nm} kül oldu.`, 'bad');
@@ -304,13 +330,18 @@ export class EventSystem {
       activeEffects: this.activeEffects,
       eventAcc: this.eventAcc,
       plagueTimer: this.plagueTimer,
+      lastBarbar: this.lastBarbar,
     };
   }
 
   restore(data: unknown): void {
-    const d = data as { activeEffects: ActiveEffect[]; eventAcc: number; plagueTimer: number };
+    const d = data as {
+      activeEffects: ActiveEffect[]; eventAcc: number; plagueTimer: number;
+      lastBarbar?: number;
+    };
     this.activeEffects = d.activeEffects;
     this.eventAcc = d.eventAcc;
     this.plagueTimer = d.plagueTimer;
+    this.lastBarbar = d.lastBarbar ?? -1e9;
   }
 }

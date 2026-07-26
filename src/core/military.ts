@@ -307,7 +307,8 @@ export class MilitarySystem {
     else if (edge === 1) { sx = w.W - 3; sy = (host.rng() * w.H) | 0; }
     else if (edge === 2) { sx = (host.rng() * w.W) | 0; sy = 2; }
     else { sx = (host.rng() * w.W) | 0; sy = w.H - 3; }
-    const size = 6 + Math.round(host.pop() * 0.4) + host.year() * 2;
+    // denge turu: 6+pop*0.4+yıl*2 erken oyunda ezici bulundu — yumuşatıldı
+    const size = 4 + Math.round(host.pop() * 0.3) + Math.round(host.year() * 1.5);
     this.armies.push({
       id: this.nextAID++, owner: 'barbar',
       x: sx + 0.5, y: sy + 0.5, px: sx + 0.5, py: sy + 0.5,
