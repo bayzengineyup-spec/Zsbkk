@@ -10,7 +10,7 @@ import { BUILDINGS, costStr, upgradeCost, upgradeTime, type BuildingType } from 
 import { Camera, type Viewport } from './render/camera';
 import { buildTileSprites, buildTreeSprites, buildTintMap, buildResourceIcons } from './render/tiles';
 import { buildBuildingSprites, buildCapitalSprite } from './render/buildings';
-import { drawScene, type Frame, type Ghost, type RenderStats, type TileSel } from './render/scene';
+import { drawScene, TerrainCache, type Frame, type Ghost, type RenderStats, type TileSel } from './render/scene';
 import { MiniMap } from './render/minimap';
 import { TouchInput } from './ui/input';
 import { initToasts, toast } from './ui/toast';
@@ -70,6 +70,7 @@ const capDay = buildCapitalSprite(false);
 const capNight = buildCapitalSprite(true);
 const treeSprites = buildTreeSprites();
 const resIcons = buildResourceIcons();
+const terrain = new TerrainCache();
 let tintMap: Float32Array | null = null; // dünya kurulunca üretilir
 let world: World | null = null;
 let sim: Sim | null = null;
@@ -592,6 +593,7 @@ el<HTMLButtonElement>('end-again').onclick = () => {
 function finishSetup(focusX: number, focusY: number): void {
   if (!world || !sim) return;
   tintMap = buildTintMap(world); // kozmetik çayır ton yamaları
+  terrain.invalidate(); // yeni dünya → arazi ön-belleği tazelenir
   minimap = new MiniMap(world);
   sel = null; ghost = null;
   hideInfo();
@@ -710,7 +712,7 @@ function loop(t: number): void {
       bSprites: night ? bSpritesNight : bSpritesDay,
       treeSprites,
       capSprite: night ? capNight : capDay,
-      tintMap, resIcons,
+      tintMap, resIcons, terrain,
       sim, sel, ghost, alpha, t: renderT, stats,
     };
     drawScene(frame);

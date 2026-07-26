@@ -75,6 +75,7 @@ export interface Frame {
   /** dünya uzayında sürekli çayır ton haritası (-1..1, kozmetik) */
   tintMap: Float32Array | null;
   resIcons: Map<ResourceKind, TileSprite>;
+  terrain: TerrainCache;
   sim: Sim | null;
   sel: TileSel | null;
   ghost: Ghost | null;
@@ -771,6 +772,124 @@ function diamondPath(
   ctx.closePath();
 }
 
+/* ============================================================
+   ARAZİ ÖN-BELLEĞİ — arazi statiktir (taban + biyom kenarı +
+   detay + ton yaması). Ekran + kenar payı bir offscreen tuvale
+   BİR KEZ boyanır; her karede tek drawImage ile basılır.
+   Kaydırma kenar payını aşınca veya zoom değişince yeniden boyanır.
+   Sis / toprak tonu / nesneler dinamiktir, ön-belleğe girmez.
+   ============================================================ */
+export class TerrainCache {
+  private cnv = document.createElement('canvas');
+  private tctx: CanvasRenderingContext2D | null = null;
+  private bx = 0;
+  private by = 0;
+  private zoom = -1;
+  private margin = 0;
+  private valid = false;
+
+  /** Dünya değişince (yeni oyun / kayıt yükleme) çağrılır. */
+  invalidate(): void { this.valid = false; }
+
+  /** Gerekirse yeniden boya, sonra ana tuvale tek çizimde bas. */
+  draw(f: Frame): void {
+    const { cam, view, ctx } = f;
+    const M = Math.ceil(TILE_W * 2.5 * cam.zoom) + 8; // kenar payı (iç px)
+    const W = view.w + M * 2, H = view.h + M * 2;
+    if (
+      !this.valid || this.zoom !== cam.zoom
+      || this.cnv.width !== W || this.cnv.height !== H
+      || Math.abs(cam.x - this.bx) > M || Math.abs(cam.y - this.by) > M
+    ) {
+      this.rebake(f, M, W, H);
+    }
+    ctx.drawImage(this.cnv, this.bx - cam.x - this.margin, this.by - cam.y - this.margin);
+  }
+
+  private rebake(f: Frame, M: number, W: number, H: number): void {
+    const { cam, view, world } = f;
+    if (this.cnv.width !== W || this.cnv.height !== H) {
+      this.cnv.width = W; this.cnv.height = H;
+      this.tctx = null;
+    }
+    const t = this.tctx ?? (this.tctx = this.cnv.getContext('2d')!);
+    t.fillStyle = '#0d0a07';
+    t.fillRect(0, 0, W, H);
+
+    const z = cam.zoom;
+    const Mcss = M / view.dpr;
+    const cssW = view.w / view.dpr, cssH = view.h / view.dpr;
+    const corners = [
+      cam.screenToWorld(-Mcss, -Mcss), cam.screenToWorld(cssW + Mcss, -Mcss),
+      cam.screenToWorld(-Mcss, cssH + Mcss), cam.screenToWorld(cssW + Mcss, cssH + Mcss),
+    ];
+    let minGx = Infinity, maxGx = -Infinity, minGy = Infinity, maxGy = -Infinity;
+    for (const c of corners) {
+      if (c.gx < minGx) minGx = c.gx;
+      if (c.gx > maxGx) maxGx = c.gx;
+      if (c.gy < minGy) minGy = c.gy;
+      if (c.gy > maxGy) maxGy = c.gy;
+    }
+    minGx = Math.max(0, minGx - 3); maxGx = Math.min(world.W - 1, maxGx + 3);
+    minGy = Math.max(0, minGy - 3); maxGy = Math.min(world.H - 1, maxGy + 3);
+
+    const halfWz = (TILE_W / 2) * z, halfHz = (TILE_H / 2) * z;
+    for (let s = minGx + minGy; s <= maxGx + maxGy; s++) {
+      const gxS = Math.max(minGx, s - maxGy), gxE = Math.min(maxGx, s - minGy);
+      for (let gx = gxS; gx <= gxE; gx++) {
+        const gy = s - gx;
+        const i = world.idx(gx, gy);
+        const h = world.height[i];
+        const biome = world.tiles[i];
+        const spr = f.tileSprites.get(`${biome}:${shadeBucket(h)}`);
+        if (!spr) continue;
+        const p = cam.worldToScreen(gx, gy, h);
+        const px = p.x + M, py = p.y + M;
+        if (px < -TILE_W * z || px > W + TILE_W * z) continue;
+        if (py < -TILE_H * 3 * z || py > H + TILE_H * 3 * z) continue;
+        // taban (0.75px taşma: dikiş örtme)
+        t.drawImage(spr.cnv, px - halfWz - 0.75, py - halfHz - 0.75, spr.w * z + 1.5, spr.h * z + 1.5);
+        // biyom sınırı yumuşatma
+        if (!BIOMES[biome].water) {
+          for (const [dx, dy, ek] of EDGE_DIRS) {
+            const nx = gx + dx, ny = gy + dy;
+            if (!world.inBounds(nx, ny)) continue;
+            const nb = world.tiles[world.idx(nx, ny)];
+            if (nb === biome || BIOMES[nb].water) continue;
+            const eSpr = f.tileSprites.get(`${nb}:${ek}`);
+            if (eSpr) {
+              t.drawImage(eSpr.cnv, px - halfWz - 0.75, py - halfHz - 0.75, eSpr.w * z + 1.5, eSpr.h * z + 1.5);
+            }
+          }
+        }
+        // detay varyantı
+        if (z >= 0.75) {
+          const det = f.tileSprites.get(`${biome}:d${tileHash(i) % DETAIL_VARIANTS}`);
+          if (det) {
+            t.drawImage(det.cnv, px - halfWz - 0.75, py - halfHz - 0.75, det.w * z + 1.5, det.h * z + 1.5);
+          }
+        }
+        // büyük ton yaması
+        if (f.tintMap && GRASSY.has(biome)) {
+          const tv = f.tintMap[i];
+          if (tv > 0.08) {
+            diamondPath(t, px, py, halfWz + 1, halfHz + 1);
+            t.fillStyle = `rgba(198,182,86,${Math.min(0.12, (tv - 0.08) * 0.34)})`;
+            t.fill();
+          } else if (tv < -0.08) {
+            diamondPath(t, px, py, halfWz + 1, halfHz + 1);
+            t.fillStyle = `rgba(14,50,24,${Math.min(0.13, (-tv - 0.08) * 0.34)})`;
+            t.fill();
+          }
+        }
+      }
+    }
+    this.bx = cam.x; this.by = cam.y;
+    this.zoom = z; this.margin = M;
+    this.valid = true;
+  }
+}
+
 export function drawScene(f: Frame): void {
   const { ctx, world, cam, view, sim } = f;
   ctx.fillStyle = '#0d0a07';
@@ -822,9 +941,40 @@ export function drawScene(f: Frame): void {
   let drawn = 0;
   f.stats.sprites = 0;
   const halfWz = (TILE_W / 2) * z, halfHz = (TILE_H / 2) * z;
-
-  // uzaktan yakına: köşegen sırası
   const sMin = minGx + minGy, sMax = maxGx + maxGy;
+
+  // ---- arazi: ön-bellekten TEK çizim (taban+kenar+detay+ton) ----
+  f.terrain.draw(f);
+
+  // ---- sis örtüsü: tüm elmaslar tek yolda, 2 doldurma ----
+  if (sim) {
+    const fills: Array<[number, string]> = [[0, '#0d0a07'], [1, 'rgba(13,10,7,0.5)']];
+    for (const [lvl, style] of fills) {
+      ctx.beginPath();
+      let any = false;
+      for (let s = sMin; s <= sMax; s++) {
+        const gxS = Math.max(minGx, s - maxGy), gxE = Math.min(maxGx, s - minGy);
+        for (let gx = gxS; gx <= gxE; gx++) {
+          const gy = s - gx;
+          const i = world.idx(gx, gy);
+          if (sim.vis[i] !== lvl) continue;
+          const p = cam.worldToScreen(gx, gy, world.height[i]);
+          if (p.x < -TILE_W * z || p.x > view.w + TILE_W * z) continue;
+          if (p.y < -TILE_H * 3 * z || p.y > view.h + TILE_H * 3 * z) continue;
+          const hw = halfWz + 1.5, hh = halfHz + 1 + 2 * z;
+          ctx.moveTo(p.x, p.y - halfHz - 1);
+          ctx.lineTo(p.x + hw, p.y);
+          ctx.lineTo(p.x, p.y + hh);
+          ctx.lineTo(p.x - hw, p.y);
+          ctx.closePath();
+          any = true;
+        }
+      }
+      if (any) { ctx.fillStyle = style; ctx.fill(); }
+    }
+  }
+
+  // uzaktan yakına: köşegen sırası (yalnız dinamik nesneler)
   for (let s = sMin; s <= sMax; s++) {
     const gxStart = Math.max(minGx, s - maxGy);
     const gxEnd = Math.min(maxGx, s - minGy);
@@ -836,52 +986,11 @@ export function drawScene(f: Frame): void {
       if (visLevel === 0) continue;
       const h = world.height[i];
       const biome = world.tiles[i];
-      const spr = f.tileSprites.get(`${biome}:${shadeBucket(h)}`);
-      if (!spr) continue;
       const c = cam.worldToScreen(gx, gy, h);
       if (c.x < -TILE_W * z || c.x > view.w + TILE_W * z) continue;
       if (c.y < -TILE_H * 3 * z || c.y > view.h + TILE_H * 3 * z) continue;
       const dim = visLevel === 1;
-      if (dim) ctx.globalAlpha = 0.5; // keşfedilmiş ama görüş dışı: loş
-      // 0.75px taşma: kesirli konumlarda sprite dikişlerini örter
-      ctx.drawImage(spr.cnv, c.x - halfWz - 0.75, c.y - halfHz - 0.75, spr.w * z + 1.5, spr.h * z + 1.5);
-      // biyom sınırı yumuşatma: farklı komşunun rengi kenardan içeri taşar
-      if (!BIOMES[biome].water) {
-        for (const [dx, dy, ek] of EDGE_DIRS) {
-          const nx = gx + dx, ny = gy + dy;
-          if (!world.inBounds(nx, ny)) continue;
-          const nb = world.tiles[world.idx(nx, ny)];
-          if (nb === biome || BIOMES[nb].water) continue;
-          const eSpr = f.tileSprites.get(`${nb}:${ek}`);
-          if (eSpr) {
-            ctx.drawImage(eSpr.cnv, c.x - halfWz - 0.75, c.y - halfHz - 0.75, eSpr.w * z + 1.5, eSpr.h * z + 1.5);
-          }
-        }
-      }
-
-      // detay katmanı: karo konumundan deterministik varyant (tekrar kırıcı).
-      // Çok uzak zoom'da atlanır — zaten seçilemez, çizim maliyeti düşer.
-      if (z >= 0.75) {
-        const det = f.tileSprites.get(`${biome}:d${tileHash(i) % DETAIL_VARIANTS}`);
-        if (det) {
-          ctx.drawImage(det.cnv, c.x - halfWz - 0.75, c.y - halfHz - 0.75, det.w * z + 1.5, det.h * z + 1.5);
-        }
-      }
-
-      // büyük ölçekli çayır ton yamaları: karo sınırı TANIMAZ (dünya
-      // uzayında sürekli gürültü) → kalan karo hissini eritir
-      if (f.tintMap && GRASSY.has(biome)) {
-        const tv = f.tintMap[i];
-        if (tv > 0.08) {
-          diamondPath(ctx, c.x, c.y, halfWz + 1, halfHz + 1);
-          ctx.fillStyle = `rgba(198,182,86,${Math.min(0.12, (tv - 0.08) * 0.34)})`;
-          ctx.fill();
-        } else if (tv < -0.08) {
-          diamondPath(ctx, c.x, c.y, halfWz + 1, halfHz + 1);
-          ctx.fillStyle = `rgba(14,50,24,${Math.min(0.13, (-tv - 0.08) * 0.34)})`;
-          ctx.fill();
-        }
-      }
+      if (dim) ctx.globalAlpha = 0.5; // keşfedilmiş ama görüş dışı: nesneler loş
       drawn++;
 
       // krallık toprağı tonu

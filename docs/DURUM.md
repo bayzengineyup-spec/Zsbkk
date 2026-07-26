@@ -12,8 +12,11 @@
   **M3 de tamam:** dünya uzayında sürekli ton yamaları (karo sınırı
   tanımaz), 8 kaynak için el çizimi mini ikonlar, iş başındaki köylülerde
   alet sallama animasyonu (balta/kazma/çapa).
-  Sırada: Faz 2 kapanışı için performans (chunk bake) değerlendirmesi
-  veya Faz 3 (kayıt genişletme: slotlar, IndexedDB, çevrimdışı ilerleme).
+  **Performans turu da tamam:** arazi ön-belleği (TerrainCache) ile karo
+  başına 3-4 çizim → karede tek drawImage; sis tek yol+2 doldurma.
+  Yazılım render'ında bile 60 fps'e kilitlendi (42-48'den).
+  Sırada: **Faz 3 — kayıt genişletme** (slotlar, IndexedDB, çevrimdışı
+  ilerleme) veya Faz 4 (savaş derinliği) — kullanıcı yönlendirmesine göre.
 - **Sürüm:** v0.7 (Faz 2 M2) · referans: `prototype/kralliklar-cagi-v0.5.html`.
 - **Son güncelleme:** 2026-07-26 (2. oturum).
 - **Bilinçli ertelenenler:** WebGL atlas / chunk bake (Canvas2D ~42-56 fps
@@ -21,6 +24,19 @@
   ikon çizimleri (Faz 2 M3), kayıt slotları/IndexedDB/çevrimdışı (Faz 3).
 
 ## ✅ Tamamlanan
+### FAZ 2 · Performans Turu — Arazi Ön-Belleği (2. oturum, devam)
+- **TerrainCache (`render/scene.ts`):** arazi statik olduğundan
+  (taban + biyom kenarı geçişi + detay varyantı + ton yaması) ekran +
+  2.5 karoluk kenar payı offscreen tuvale BİR KEZ boyanır; her karede
+  tek `drawImage`. Kaydırma kenar payını aşınca veya zoom değişince
+  yeniden boyanır (en kötü durum = eski karede-bir-çizim maliyeti).
+- **Sis örtüsü toplu doldurma:** karo başına çizim yerine görünmeyen
+  (vis0, opak koyu) ve loş (vis1, yarı saydam) elmaslar tek yolda
+  toplanıp 2 doldurmayla basılır. Loş karolardaki nesneler eskisi gibi
+  yarı saydam çizilir — görsel sonuç birebir aynı.
+- **Sonuç:** yazılım render'ında (GPU'suz test ortamı) 42-48 → **60 fps
+  (tavan)**; gerçek cihazda daha da rahat. Görsel çıktı değişmedi.
+- 88/88 test yeşil, sıfır konsol hatası.
 ### FAZ 2 · M3 — Boyamsı Zemin + İkonlar + Çalışma Pozları (2. oturum, devam)
 - **Büyük ton yamaları (`buildTintMap`):** dünya tohumundan üretilen
   sürekli fbm gürültüsü karo başına -1..1 değer verir; çayır ailesi
