@@ -46,7 +46,7 @@
       inset 0 0 30px rgba(90,60,20,0.26);
   }
   /* parşömen üstü düğme: bakır çerçeveli, hafif kabartma */
-  .pbtn, #ti-act button, .dacts button, #placebar button, #menupanel button {
+  .pbtn, #ti-act button, .dacts button, #placebar button, #menupanel button, .slotcard button {
     font-family: inherit; font-size: 11.5px; padding: 7px 10px; min-height: 34px;
     color: var(--ink); cursor: pointer;
     background: linear-gradient(180deg, rgba(255,246,216,0.55), rgba(160,128,76,0.28));
@@ -329,6 +329,25 @@
     border-radius: 999px; padding: 3px 12px; background: rgba(30,18,8,0.5);
   }
   #loadmsg { display: none; color: var(--gold); font-size: 13px; letter-spacing: 0.5px; }
+
+  /* ---- kayıt slotları ---- */
+  #slots { display: flex; flex-direction: column; gap: 9px; width: min(350px, 88vw); }
+  .slotcard {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    background-color: var(--parch);
+    background-image: var(--tex-parchment, none);
+    border: 2px solid var(--wood-edge); border-radius: 6px; text-align: left;
+    box-shadow: 0 5px 16px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,240,200,0.4), inset 0 0 24px rgba(90,60,20,0.24);
+  }
+  .slotcard .sl-info { flex: 1; min-width: 0; }
+  .slotcard .sl-t {
+    font-weight: bold; color: var(--ink-head); font-variant: small-caps;
+    letter-spacing: 0.5px; font-size: 13px;
+  }
+  .slotcard .sl-d { font-size: 11px; color: var(--ink-dim); margin-top: 1px; }
+  .slotcard.empty .sl-t { color: var(--ink-dim); }
+  .slotcard button { min-height: 32px; padding: 6px 10px; font-size: 11.5px; white-space: nowrap; }
+  .slotcard button.danger { border-color: #6a2418; color: var(--danger); }
 </style>
 </head>
 <body>
@@ -419,14 +438,14 @@
   <span class="m1">Faz 2 · Görsel Kimlik</span>
   <h1>Krallıklar Çağı</h1>
   <p>Sisin ardında rakip krallıklar büyüyor. Köyünü kur, felaketlere hazırlan, diplomasiyi kullan. Oyun otomatik kaydedilir — kaldığın yerden devam edersin.</p>
+  <div id="slots"></div>
   <div class="ctl">
-    <button class="play" id="opt-continue" style="display:none">▶ Devam Et</button>
+    <span style="font-size:11px;color:#8a744e">Yeni dünya boyutu:</span>
     <select id="opt-size">
       <option value="128">Küçük · 128</option>
       <option value="192" selected>Orta · 192</option>
       <option value="256">Büyük · 256</option>
     </select>
-    <button class="play" id="opt-play">Yeni Dünya ▸</button>
   </div>
   <div id="loadmsg">Dünya üretiliyor…</div>
   <div class="seedrow">Tohum: <span id="opt-seed">rastgele</span></div>

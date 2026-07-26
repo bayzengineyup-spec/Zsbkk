@@ -15,8 +15,10 @@
   **Performans turu da tamam:** arazi ön-belleği (TerrainCache) ile karo
   başına 3-4 çizim → karede tek drawImage; sis tek yol+2 doldurma.
   Yazılım render'ında bile 60 fps'e kilitlendi (42-48'den).
-  Sırada: **Faz 3 — kayıt genişletme** (slotlar, IndexedDB, çevrimdışı
-  ilerleme) veya Faz 4 (savaş derinliği) — kullanıcı yönlendirmesine göre.
+  **FAZ 3 · M1 de TAMAM:** IndexedDB depolama + 3 kayıt slotu +
+  çevrimdışı ilerleme çalışıyor (94 test).
+  Sırada: Faz 4 (savaş derinliği: birim kontrolü, taktik) veya kalan
+  Faz 3 işleri — kullanıcı yönlendirmesine göre.
 - **Sürüm:** v0.7 (Faz 2 M2) · referans: `prototype/kralliklar-cagi-v0.5.html`.
 - **Son güncelleme:** 2026-07-26 (2. oturum).
 - **Bilinçli ertelenenler:** WebGL atlas / chunk bake (Canvas2D ~42-56 fps
@@ -24,6 +26,28 @@
   ikon çizimleri (Faz 2 M3), kayıt slotları/IndexedDB/çevrimdışı (Faz 3).
 
 ## ✅ Tamamlanan
+### FAZ 3 · M1 — IndexedDB + Kayıt Slotları + Çevrimdışı İlerleme (2. oturum)
+- **Depolama katmanı (`ui/storage.ts`):** IndexedDB asıl depo (localStorage
+  ~5MB sınırı yok), açılışta tüm kayıtlar belleğe alınır → oyun içi okuma
+  senkron, yazma asenkron (akış takılmaz). IDB yoksa localStorage yedeğine,
+  o da yoksa bellek-içi çalışmaya düşer.
+- **3 kayıt slotu (`ui/persist.ts` v2):** `save:0..2` anahtarları, aktif
+  slot kavramı; boot ekranında parşömen slot kartları — dolu: "📜 Kayıt 1 ·
+  3. yıl · 👥 12 · 3 saat önce · ▶ Devam / 🗑 Sil (onaylı)", boş: "🌍 Yeni
+  Dünya". Eski tek-kayıt (localStorage) açılışta boş slota otomatik taşınır.
+- **Çevrimdışı ilerleme (`core/offline.ts`):** kayda `savedAt` damgası;
+  devam edilince geçen süre kadar KABA üretim: yalnız girdisiz üreticiler,
+  işçi×seviye×%50 verim, 8 saat tavan, 2dk altı yok sayılır, depo tavanı
+  uygulanır, kısık tüketim, ÖLÜM YOK. RNG kullanmaz → deterministik.
+  Rapor bildirimi: "⏰ Sen yokken (3sa): 🍞+540 · halk 448🍞 yedi."
+  Uygulandıktan hemen sonra yeni damgayla kaydedilir (çifte ilerleme yok).
+- **Düzeltme:** şantiye halindeki meydanla kaydedilen oyun, devam edilince
+  yanlışlıkla "meydan kur" moduna düşüyordu — artık meydan binası (şantiye
+  dahil) varsa yerleştirme istenmez.
+- **Testler: 94/94** — 6 yeni çevrimdışı testi (kısa süre, kazanç raporu,
+  8sa tavan+depo tavanı, ölümsüzlük, determinizm, zincir binası üretmez).
+  Tarayıcıda: kayıt→yenile→slot kartı "3 saat önce"→Devam→rapor bildirimi
+  doğrulandı; IndexedDB yenilemeden sağ çıkıyor. 58 fps, sıfır hata.
 ### FAZ 2 · Performans Turu — Arazi Ön-Belleği (2. oturum, devam)
 - **TerrainCache (`render/scene.ts`):** arazi statik olduğundan
   (taban + biyom kenarı geçişi + detay varyantı + ton yaması) ekran +

@@ -157,12 +157,14 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   },
 };
 
+export const RES_ICONS: Record<ResKey, string> = {
+  food: '🍞', wood: '🪵', stone: '🪨', gold: '🪙', know: '📜',
+  plank: '🪚', flour: '🌫', bread: '🥖',
+};
+
 /** Maliyeti "🪵30 🪨40" biçiminde yaz. */
 export function costStr(cost: Cost): string {
-  const ICONS: Record<ResKey, string> = {
-    food: '🍞', wood: '🪵', stone: '🪨', gold: '🪙', know: '📜',
-    plank: '🪚', flour: '🌫', bread: '🥖',
-  };
+  const ICONS = RES_ICONS;
   const parts: string[] = [];
   for (const k of Object.keys(cost) as ResKey[]) {
     const v = cost[k];

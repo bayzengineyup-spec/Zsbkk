@@ -14,7 +14,12 @@ import { drawScene, TerrainCache, type Frame, type Ghost, type RenderStats, type
 import { MiniMap } from './render/minimap';
 import { TouchInput } from './ui/input';
 import { initToasts, toast } from './ui/toast';
-import { saveNow, hasSave, restoreGame, clearSave, exportSave, importSave } from './ui/persist';
+import {
+  initPersist, saveNow, restoreGame, clearSave, exportSave, importSave,
+  saveMeta, setActiveSlot, SLOT_COUNT,
+} from './ui/persist';
+import { applyOfflineProgress } from './core/offline';
+import { RES_ICONS } from './data/buildings';
 import {
   sfx, sndResume, updateMusic, loadSoundPrefs, soundOn, toggleSound,
   getMusicVol, getSfxVol, setMusicVol, setSfxVol,
@@ -74,9 +79,12 @@ const terrain = new TerrainCache();
 let tintMap: Float32Array | null = null; // dünya kurulunca üretilir
 let world: World | null = null;
 let sim: Sim | null = null;
-// geliştirici konsolu için salt-okunur erişim (duman testleri de kullanır)
+// geliştirici konsolu için erişim (duman testleri de kullanır)
 Object.defineProperty(window, '__game', {
-  get: () => ({ sim, world }),
+  get: () => ({
+    sim, world,
+    save: () => { if (sim) saveNow(sim, { tut: { ...Tut } }); },
+  }),
 });
 let minimap: MiniMap | null = null;
 let sel: TileSel | null = null;
@@ -516,7 +524,7 @@ el('m-new').onclick = () => {
   if (sim && !sim.gameOver) saveNow(sim, { tut: { ...Tut } }); // mevcut oyunu kaybetme
   closeMenu();
   el('boot').style.display = 'flex';
-  refreshBootButtons();
+  renderSlots();
   world = null; sim = null; minimap = null;
   cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); hideInfo();
 };
@@ -586,7 +594,7 @@ el<HTMLButtonElement>('end-again').onclick = () => {
   world = null; sim = null; minimap = null;
   cancelPlace(); closeBuildPanel(); closeDiplo(); closeTech(); hideInfo();
   el('boot').style.display = 'flex';
-  refreshBootButtons();
+  renderSlots();
 };
 
 // ---------- dünya kurulumu ----------
@@ -643,26 +651,94 @@ function continueGame(): void {
     world = r.world;
     sim = r.sim;
     resetTutorial(r.ui.tut);
+    // çevrimdışı ilerleme: sen yokken köy kaba üretim yaptı
+    const rep = applyOfflineProgress(sim, r.elapsedSec);
     const c = sim.villageCenter();
     finishSetup(c.x, c.y);
-    if (!sim.player.hasCenter) {
+    // meydan hiç YOKSA yerleştirme iste (şantiye halindeki meydan sayılır!)
+    const centerExists = sim.player.buildings.some(b => b.type === 'center');
+    if (!centerExists) {
       enterPlace('center');
       hint('Köy meydanını kurmak için bir yer seç');
+    } else if (rep) {
+      // hemen yeni damgayla kaydet — yenileme çifte ilerleme vermesin
+      saveNow(sim, { tut: { ...Tut } });
+      const parts = rep.gains.map(([k, v]) => `${RES_ICONS[k]}+${v}`).join(' ');
+      toast(
+        `⏰ Sen yokken (${fmtDur(rep.seconds)}): ${parts || 'üretim yok'}`
+        + (rep.eaten > 0 ? ` · halk ${rep.eaten}🍞 yedi` : ''),
+        'good',
+      );
+      refreshHUD();
     } else {
       toast('▶ Kaldığın yerden devam ediyorsun.', 'good');
     }
   }, 30);
 }
 
-function refreshBootButtons(): void {
-  el<HTMLElement>('opt-continue').style.display = hasSave() ? '' : 'none';
+// ---------- kayıt slotları (boot ekranı) ----------
+function fmtDur(secs: number): string {
+  const m = Math.round(secs / 60);
+  if (m < 60) return `${m}dk`;
+  return `${Math.floor(m / 60)}sa ${m % 60}dk`;
 }
 
-el<HTMLButtonElement>('opt-play').onclick = () => {
-  startGame(parseInt(el<HTMLSelectElement>('opt-size').value, 10));
-};
-el<HTMLButtonElement>('opt-continue').onclick = continueGame;
-refreshBootButtons();
+function fmtAgo(ms: number | null): string {
+  if (!ms) return '';
+  const m = Math.round((Date.now() - ms) / 60000);
+  if (m < 1) return 'az önce';
+  if (m < 60) return `${m} dk önce`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h} saat önce`;
+  return `${Math.floor(h / 24)} gün önce`;
+}
+
+function renderSlots(): void {
+  const wrap = el<HTMLElement>('slots');
+  wrap.innerHTML = '';
+  for (let i = 0; i < SLOT_COUNT; i++) {
+    const m = saveMeta(i);
+    const card = document.createElement('div');
+    card.className = 'slotcard' + (m ? '' : ' empty');
+    const info = document.createElement('div');
+    info.className = 'sl-info';
+    if (m) {
+      info.innerHTML = `<div class="sl-t">📜 Kayıt ${i + 1}</div>`
+        + `<div class="sl-d">${m.year}. yıl · 👥 ${m.pop} · ${m.W}×${m.H}`
+        + (m.savedAt ? ` · ${fmtAgo(m.savedAt)}` : '') + '</div>';
+      const cont = document.createElement('button');
+      cont.className = 'primary';
+      cont.textContent = '▶ Devam';
+      cont.onclick = () => { setActiveSlot(i); continueGame(); };
+      const del = document.createElement('button');
+      del.className = 'danger';
+      del.textContent = '🗑';
+      del.title = 'Kaydı sil';
+      del.onclick = () => {
+        if (confirm(`Kayıt ${i + 1} silinsin mi? (${m.year}. yıl, ${m.pop} nüfus)`)) {
+          clearSave(i);
+          renderSlots();
+        }
+      };
+      card.append(info, cont, del);
+    } else {
+      info.innerHTML = `<div class="sl-t">Boş Kayıt ${i + 1}</div>`
+        + '<div class="sl-d">Yeni bir krallık kur</div>';
+      const nw = document.createElement('button');
+      nw.className = 'primary';
+      nw.textContent = '🌍 Yeni Dünya';
+      nw.onclick = () => {
+        setActiveSlot(i);
+        startGame(parseInt(el<HTMLSelectElement>('opt-size').value, 10));
+      };
+      card.append(info, nw);
+    }
+    wrap.appendChild(card);
+  }
+}
+
+/* depo hazır olunca slotları göster (IndexedDB açılışı asenkron) */
+void initPersist().then(renderSlots);
 
 // ---------- otomatik kayıt ----------
 // aralıklı + uygulama arka plana geçince (docs/10-KAYIT); biten oyun kaydedilmez
