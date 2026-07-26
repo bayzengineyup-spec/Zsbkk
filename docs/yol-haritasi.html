@@ -1,0 +1,439 @@
+<style>
+  :root {
+    /* açık tema (parşömen) — temel */
+    --bg:        #ece2cd;
+    --bg-2:      #e3d7bd;
+    --surface:   #f4eddc;
+    --surface-2: #efe6d0;
+    --edge:      #d3c29e;
+    --edge-soft: #e0d2b2;
+    --ink:       #2a2016;
+    --ink-2:     #4a3d2a;
+    --ink-dim:   #7a6a4c;
+    --gold:      #9c6f1c;
+    --gold-2:    #b98a2e;
+    --gold-glow: rgba(156,111,28,0.18);
+    --war:       #a8412c;
+    --shadow:    0 10px 34px rgba(60,44,20,0.18);
+    --shadow-sm: 0 3px 12px rgba(60,44,20,0.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:        #0d0a07;
+      --bg-2:      #120d09;
+      --surface:   #191310;
+      --surface-2: #1f1712;
+      --edge:      #3a2c1e;
+      --edge-soft: #2a2016;
+      --ink:       #e8dcc8;
+      --ink-2:     #cabfa6;
+      --ink-dim:   #9c8a68;
+      --gold:      #d9a441;
+      --gold-2:    #eac069;
+      --gold-glow: rgba(217,164,65,0.22);
+      --war:       #c0503a;
+      --shadow:    0 14px 40px rgba(0,0,0,0.55);
+      --shadow-sm: 0 4px 16px rgba(0,0,0,0.45);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg:#ece2cd; --bg-2:#e3d7bd; --surface:#f4eddc; --surface-2:#efe6d0;
+    --edge:#d3c29e; --edge-soft:#e0d2b2; --ink:#2a2016; --ink-2:#4a3d2a; --ink-dim:#7a6a4c;
+    --gold:#9c6f1c; --gold-2:#b98a2e; --gold-glow:rgba(156,111,28,0.18); --war:#a8412c;
+    --shadow:0 10px 34px rgba(60,44,20,0.18); --shadow-sm:0 3px 12px rgba(60,44,20,0.12);
+  }
+  :root[data-theme="dark"] {
+    --bg:#0d0a07; --bg-2:#120d09; --surface:#191310; --surface-2:#1f1712;
+    --edge:#3a2c1e; --edge-soft:#2a2016; --ink:#e8dcc8; --ink-2:#cabfa6; --ink-dim:#9c8a68;
+    --gold:#d9a441; --gold-2:#eac069; --gold-glow:rgba(217,164,65,0.22); --war:#c0503a;
+    --shadow:0 14px 40px rgba(0,0,0,0.55); --shadow-sm:0 4px 16px rgba(0,0,0,0.45);
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(120% 80% at 50% -10%, var(--gold-glow), transparent 60%),
+      var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  :root {
+    --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --font-body: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, monospace;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 20px; }
+
+  /* ---------- hero ---------- */
+  header.hero { padding: 68px 0 34px; text-align: center; }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11.5px; letter-spacing: 0.32em; text-transform: uppercase;
+    color: var(--gold); margin: 0 0 18px;
+  }
+  .crest {
+    width: 46px; height: 46px; margin: 0 auto 20px; display: block;
+    color: var(--gold); opacity: 0.9;
+  }
+  h1.title {
+    font-family: var(--font-display);
+    font-weight: 600; font-size: clamp(40px, 9vw, 74px);
+    line-height: 1.02; margin: 0; letter-spacing: -0.01em;
+    text-wrap: balance;
+    background: linear-gradient(178deg, var(--ink) 0%, var(--gold-2) 130%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .lede {
+    max-width: 40ch; margin: 20px auto 0; color: var(--ink-2);
+    font-size: clamp(15px, 2.4vw, 18px); text-wrap: pretty;
+  }
+  .status {
+    display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 26px; padding: 9px 16px;
+    background: var(--surface); border: 1px solid var(--edge);
+    border-radius: 999px; box-shadow: var(--shadow-sm);
+    font-size: 13px; color: var(--ink-2);
+  }
+  .status .dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--gold);
+    box-shadow: 0 0 0 4px var(--gold-glow);
+  }
+  .status b { color: var(--ink); font-weight: 600; }
+  .status .sep { width: 1px; height: 14px; background: var(--edge); }
+  .status code { font-family: var(--font-mono); font-size: 12px; color: var(--gold); }
+
+  /* ---------- section frame ---------- */
+  section { padding: 26px 0; }
+  .sec-head { display: flex; align-items: baseline; gap: 12px; margin: 0 0 20px; }
+  .sec-head h2 {
+    font-family: var(--font-display); font-weight: 600;
+    font-size: clamp(21px, 4vw, 27px); margin: 0; letter-spacing: -0.01em;
+  }
+  .sec-head .num {
+    font-family: var(--font-mono); font-size: 12px; color: var(--gold);
+    border: 1px solid var(--edge); border-radius: 6px; padding: 2px 7px;
+  }
+  .rule { height: 1px; background: linear-gradient(90deg, var(--edge), transparent); border: 0; margin: 0; }
+
+  /* ---------- pillars ---------- */
+  .pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  @media (max-width: 620px) { .pillars { grid-template-columns: 1fr; } }
+  .pillar {
+    background: var(--surface); border: 1px solid var(--edge);
+    border-radius: 14px; padding: 18px; box-shadow: var(--shadow-sm);
+  }
+  .pillar .pic { font-size: 22px; line-height: 1; }
+  .pillar h3 { font-family: var(--font-display); font-size: 18px; margin: 12px 0 6px; font-weight: 600; }
+  .pillar p { margin: 0; font-size: 13.5px; color: var(--ink-dim); }
+  .foundation {
+    margin-top: 12px; background: var(--surface-2); border: 1px dashed var(--edge);
+    border-radius: 14px; padding: 15px 18px; display: flex; gap: 12px; align-items: flex-start;
+  }
+  .foundation .pic { font-size: 20px; }
+  .foundation h3 { font-family: var(--font-display); font-size: 16px; margin: 0 0 3px; font-weight: 600; }
+  .foundation p { margin: 0; font-size: 13px; color: var(--ink-dim); }
+
+  /* ---------- priorities ---------- */
+  .prios { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 620px) { .prios { grid-template-columns: 1fr; } }
+  .prio {
+    display: flex; gap: 12px; align-items: flex-start;
+    background: var(--surface); border: 1px solid var(--edge);
+    border-left: 3px solid var(--gold);
+    border-radius: 10px; padding: 13px 15px;
+  }
+  .prio .pic { font-size: 18px; margin-top: 1px; }
+  .prio b { display: block; font-size: 14px; color: var(--ink); }
+  .prio span { font-size: 12.5px; color: var(--ink-dim); }
+
+  /* ---------- timeline ---------- */
+  .timeline { position: relative; margin-top: 6px; padding-left: 30px; }
+  .timeline::before {
+    content: ""; position: absolute; left: 8px; top: 8px; bottom: 8px; width: 2px;
+    background: linear-gradient(180deg, var(--gold), var(--edge) 92%, transparent);
+    border-radius: 2px;
+  }
+  .phase { position: relative; padding: 0 0 22px; }
+  .phase::before {
+    content: ""; position: absolute; left: -30px; top: 5px;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--bg); border: 2px solid var(--cat, var(--gold));
+    box-shadow: 0 0 0 4px var(--bg), 0 0 0 5px var(--edge-soft);
+  }
+  .phase.now::before { background: var(--gold); border-color: var(--gold); box-shadow: 0 0 0 4px var(--bg), 0 0 0 6px var(--gold-glow); }
+  .phase-card {
+    background: var(--surface); border: 1px solid var(--edge);
+    border-radius: 13px; padding: 15px 17px; box-shadow: var(--shadow-sm);
+  }
+  .phase.now .phase-card { border-color: var(--gold); box-shadow: var(--shadow-sm), 0 0 0 1px var(--gold-glow); }
+  .phase-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 7px; }
+  .ptag {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em;
+    color: var(--cat, var(--gold)); border: 1px solid currentColor; opacity: 0.95;
+    padding: 1px 6px; border-radius: 5px; text-transform: uppercase;
+  }
+  .ver { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-dim); }
+  .now-badge {
+    margin-left: auto; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--bg); background: var(--gold);
+    padding: 2px 8px; border-radius: 999px; font-weight: 700;
+  }
+  .phase-card h3 { font-family: var(--font-display); font-size: 18.5px; margin: 0 0 4px; font-weight: 600; }
+  .goal { margin: 0 0 10px; font-size: 13.5px; color: var(--ink-2); }
+  .items { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+  .items li {
+    font-size: 12px; color: var(--ink-dim);
+    background: var(--surface-2); border: 1px solid var(--edge-soft);
+    border-radius: 999px; padding: 3px 10px;
+  }
+
+  /* ---------- prototype chips ---------- */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12.5px; color: var(--ink-2);
+    background: var(--surface); border: 1px solid var(--edge);
+    border-radius: 999px; padding: 6px 12px;
+  }
+  .chip .tick { color: var(--gold); font-weight: 700; }
+
+  /* ---------- footer ---------- */
+  footer { padding: 34px 0 56px; text-align: center; color: var(--ink-dim); font-size: 12.5px; }
+  footer .fx { font-family: var(--font-display); font-style: italic; font-size: 16px; color: var(--ink-2); margin-bottom: 10px; }
+  footer code { font-family: var(--font-mono); color: var(--gold); }
+
+  /* ---------- reveal ---------- */
+  .reveal { opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+  }
+</style>
+
+<header class="hero">
+  <div class="wrap">
+    <svg class="crest" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 19.3 7.2 21.7l.9-5.4L4.2 12.5l5.4-.8z"/>
+    </svg>
+    <p class="eyebrow">Geliştirme Yol Haritası</p>
+    <h1 class="title">Krallıklar&nbsp;Çağı</h1>
+    <p class="lede">Küçük bir köyden imparatorluğa; savaşın, diplomasinin ve ekonominin gerçek sonuçlar doğurduğu, her açtığında kaldığın yerden devam eden canlı bir dünya.</p>
+    <div class="status">
+      <span class="dot" aria-hidden="true"></span>
+      Şu an: <b>Faz 0'a hazır</b>
+      <span class="sep" aria-hidden="true"></span>
+      referans <code>prototip v0.5</code>
+      <span class="sep" aria-hidden="true"></span>
+      mimari <b>modüler TypeScript</b>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <hr class="rule">
+
+  <section class="reveal">
+    <div class="sec-head"><span class="num">A</span><h2>Oyunun sütunları</h2></div>
+    <div class="pillars">
+      <div class="pillar">
+        <div class="pic">🏛️</div>
+        <h3>Şehir & Ekonomi</h3>
+        <p>İnşa süreleri, üretim zincirleri, lojistik, nüfus.</p>
+      </div>
+      <div class="pillar">
+        <div class="pic">🤝</div>
+        <h3>Büyük Strateji</h3>
+        <p>Diplomasi, casusluk, krallık yönetimi, çağlar.</p>
+      </div>
+      <div class="pillar">
+        <div class="pic">⚔️</div>
+        <h3>Savaş & Fetih</h3>
+        <p>Birim kontrolü, kuşatma, komutanlar, toprak ele geçirme.</p>
+      </div>
+    </div>
+    <div class="foundation">
+      <div class="pic">🌍</div>
+      <div>
+        <h3>Ve altında: Canlı Dünya</h3>
+        <p>Tek tek görünen köylüler, hayvanlar, mevsimler, gündüz-gece ve koşullu olaylar — oyunun ruhu. Üç sütun bu canlı dünyanın üstünde işler.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section class="reveal">
+    <div class="sec-head"><span class="num">B</span><h2>Senin önceliklerin, plana işlendi</h2></div>
+    <div class="prios">
+      <div class="prio"><div class="pic">⏳</div><div><b>Bir yer kurunca süre olsun</b><span>İnşa/yükseltme süresi, işçi & kuyruk, aşamalı yükselen bina — Faz 1.</span></div></div>
+      <div class="prio"><div class="pic">🎨</div><div><b>Gerçek dokular & animasyon</b><span>"Çizgi film / yapay zeka" görünümü düzelt, oran standardı, akıcı animasyon — Faz 2.</span></div></div>
+      <div class="prio"><div class="pic">🗡️</div><div><b>Savaş & birim kontrolü</b><span>Ordu kur, seç, yürüt, saldır; kuşatma ve fetih — Faz 4.</span></div></div>
+      <div class="prio"><div class="pic">💾</div><div><b>Kaldığın yeri hatırlasın</b><span>Devam et, otomatik kayıt, çevrimdışı ilerleme — Faz 3.</span></div></div>
+      <div class="prio"><div class="pic">📱</div><div><b>Arayüz</b><span>Mobil-önce, başparmakla oynanır, temiz ve okunur — sürekli.</span></div></div>
+      <div class="prio"><div class="pic">🧩</div><div><b>Bir sürü yeni sistem</b><span>30+ bina, meslekler, çağlar, harikalar, hava, ekoloji — backlog dolu.</span></div></div>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section class="reveal">
+    <div class="sec-head"><span class="num">C</span><h2>Fazlar — köyden imparatorluğa</h2></div>
+    <div class="timeline">
+
+      <div class="phase now" style="--cat:#b98a2e">
+        <div class="phase-card">
+          <div class="phase-top"><span class="ptag">Temel</span><span class="ver">v0.6</span><span class="now-badge">Buradayız</span></div>
+          <h3>Faz 0 · Modüler temele taşı</h3>
+          <p class="goal">Prototipi test edilebilir, deterministik bir TypeScript projesine dönüştür.</p>
+          <ul class="items"><li>Vite + TS + test</li><li>Dünya üretimi core'a</li><li>Veriyi JSON'a çıkar</li></ul>
+        </div>
+      </div>
+
+      <div class="phase" style="--cat:#c8993f">
+        <div class="phase-card">
+          <div class="phase-top"><span class="ptag">Ekonomi</span><span class="ver">v0.7</span></div>
+          <h3>Faz 1 · İnşa süreleri & ekonomi</h3>
+          <p class="goal">Bina kurunca süre işlesin; üretim zincirleri başlasın.</p>
+          <ul class="items"><li>İnşa/yükseltme süresi</li><li>Üretim zincirleri</li><li>Tüm binalara seviye</li></ul>
+        </div>
+      </div>
+
+      <div class="phase" style="--cat:#4f9d80">
+        <div class="phase-card">
+          <div class="phase-top"><span class="ptag">Grafik</span><span class="ver">v0.8</span></div>
+          <h3>Faz 2 · Grafik & sanat yükseltmesi</h3>
+          <p class="goal">Gerçek dokular, doğru oranlar, akıcı animasyonlar.</p>
+          <ul class="items"><li>Doku yeniden üretimi</li><li>Boyut/oran standardı</li><li>Animasyon durumları</li></ul>
+        </div>
+      </div>
+
+      <div class="phase" style="--cat:#6a86b8">
+        <div class="phase-card">
+          <div class="phase-top"><span class="ptag">Kayıt</span><span class="ver">v0.9</span></div>
+          <h3>Faz 3 · Kayıt & devamlılık</h3>
+          <p class="goal">Kapat-aç, her şey yerinde; yokken zaman kısmen işlesin.</p>
+          <ul class="items"><li>Otomatik kayıt</li><li>Devam et</li><li>Çevrimdışı ilerleme</li></ul>
+        </div>
+      </div>
+
+      <div class="phase" style="--cat:#c0503a">
+        <div class="phase-card">
+          <div class="phase-top"><span class="ptag">Savaş</span><span class="ver">v0.10</span></div>
+          <h3>Faz 4 · Savaş & birim kontrolü</h3>
+          <p class="goal">Ordu kurup düşmana saldır, şehir kuşat ve fethet.</p>
+          <ul class="items"><li>Dokunmatik ordu kontrolü</li><li>Kuşatma & fetih</li><li>Savunma: sur/kule</li></ul>
+        </div>
+      </div>
+
+      <div class="phase" style="--cat:#c07a5a">
+        <div class="phase-card">
+          <div class="phase-top"><span class="ptag">Toplum</span><span class="ver">v0.11</span></div>
+          <h3>Faz 5 · Nüfus & toplum derinliği</h3>
+          <p class="goal">Köylüler yaşasın: yaş, meslek, ihtiyaç, hikâye.</p>
+          <ul class="items"><li>Yaşam döngüsü</li><li>İhtiyaç mutluluğu</li><li>Olay günlüğü</li></ul>
+        </div>
+      </div>
+
+      <div class="phase" style="--cat:#3f8f9d">
+        <div class="phase-card">
+          <div class="phase-top"><span class="ptag">Diplomasi</span><span class="ver">v0.12</span></div>
+          <h3>Faz 6 · Diplomasi & büyük strateji</h3>
+          <p class="goal">Yapay zekaya beyin, antlaşmalara derinlik.</p>
+          <ul class="items"><li>AI hedef & hafıza</li><li>Şartlı antlaşma</li><li>Casusluk</li></ul>
+        </div>
+      </div>
+
+      <div class="phase" style="--cat:#8a6bb0">
+        <div class="phase-card">
+          <div class="phase-top"><span class="ptag">Çağlar</span><span class="ver">v0.13</span></div>
+          <h3>Faz 7 · Çağlar & ilerleme</h3>
+          <p class="goal">Çağ atla, teknoloji ağacını büyüt, harikalar dik.</p>
+          <ul class="items"><li>Çağ sistemi</li><li>Harikalar</li><li>Zafer koşulları</li></ul>
+        </div>
+      </div>
+
+      <div class="phase" style="--cat:#6f9a45">
+        <div class="phase-card">
+          <div class="phase-top"><span class="ptag">Dünya</span><span class="ver">v0.14</span></div>
+          <h3>Faz 8 · Dünya zenginliği</h3>
+          <p class="goal">Nehirler, hava, ekoloji, özel lokasyonlar.</p>
+          <ul class="items"><li>Nehir & kaynak yatağı</li><li>Hava durumu</li><li>Ekoloji & evcilleştirme</li></ul>
+        </div>
+      </div>
+
+      <div class="phase" style="--cat:#d9a441">
+        <div class="phase-card">
+          <div class="phase-top"><span class="ptag">Cila</span><span class="ver">v0.15</span></div>
+          <h3>Faz 9 · UX, ses & yerelleştirme</h3>
+          <p class="goal">Arayüz cilası, olay günlüğü, TR/EN, katmanlı müzik.</p>
+          <ul class="items"><li>Arayüz cilası</li><li>TR + EN</li><li>Başarımlar</li></ul>
+        </div>
+      </div>
+
+      <div class="phase" style="--cat:#8a8175">
+        <div class="phase-card">
+          <div class="phase-top"><span class="ptag">Platform</span><span class="ver">v1.0</span></div>
+          <h3>Faz 10 · Platform & yayın</h3>
+          <p class="goal">İlk tam, cilalı tek-oyunculu sürüm.</p>
+          <ul class="items"><li>PWA / kurulabilir</li><li>Düşük cihaz optimizasyonu</li><li>Mağaza (opsiyonel)</li></ul>
+        </div>
+      </div>
+
+      <div class="phase" style="--cat:#a06a9a">
+        <div class="phase-card">
+          <div class="phase-top"><span class="ptag">Çok Oyunculu</span><span class="ver">v2.0</span></div>
+          <h3>Faz 11 · Çok oyunculu</h3>
+          <p class="goal">Deterministik lockstep ağ — mimari baştan buna hazır.</p>
+          <ul class="items"><li>Lockstep senkron</li><li>Lobi / masa</li><li>Anti-hile</li></ul>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section class="reveal">
+    <div class="sec-head"><span class="num">D</span><h2>Prototipte zaten çalışan güçlü temel</h2></div>
+    <div class="chips">
+      <span class="chip"><span class="tick">✓</span> Prosedürel dünya · 16 biyom</span>
+      <span class="chip"><span class="tick">✓</span> WebGL izometrik motor</span>
+      <span class="chip"><span class="tick">✓</span> Görünür köylüler</span>
+      <span class="chip"><span class="tick">✓</span> 8 kişilikli AI krallık</span>
+      <span class="chip"><span class="tick">✓</span> Diplomasi & ticaret</span>
+      <span class="chip"><span class="tick">✓</span> Komutanlar</span>
+      <span class="chip"><span class="tick">✓</span> Teknoloji ağacı</span>
+      <span class="chip"><span class="tick">✓</span> 4 mevsim & gündüz-gece</span>
+      <span class="chip"><span class="tick">✓</span> Koşullu felaketler</span>
+      <span class="chip"><span class="tick">✓</span> Yaban hayat</span>
+      <span class="chip"><span class="tick">✓</span> Sentez ses motoru</span>
+      <span class="chip"><span class="tick">✓</span> Tohum-tabanlı kayıt</span>
+    </div>
+  </section>
+
+  <footer>
+    <div class="fx">"Bir arkadaşına gönderdiğinde: bunu nereden indirdin?"</div>
+    Tüm ayrıntılar repoda: <code>docs/</code> · Canlı ilerleme: <code>docs/DURUM.md</code>
+  </footer>
+</div>
+
+<script>
+  (function () {
+    var els = document.querySelectorAll('.reveal');
+    if (!('IntersectionObserver' in window) || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      els.forEach(function (e) { e.classList.add('in'); });
+      return;
+    }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); }
+      });
+    }, { threshold: 0.12 });
+    els.forEach(function (e) { io.observe(e); });
+  })();
+</script>
